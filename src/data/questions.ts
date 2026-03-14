@@ -30,7 +30,7 @@ export interface Question {
   scoring?: QuestionScoring;
   flags?: SpecialFlag[];
   /** Which practical field this question determines */
-  practicalField?: 'usage' | 'frequency' | 'priority' | 'device' | 'collaboration' | 'budget';
+  practicalField?: 'usage' | 'frequency' | 'priority' | 'device' | 'infoStyle' | 'budget';
 }
 
 // ===== Phase 1: 성향 질문 (6개) =====
@@ -252,19 +252,24 @@ export const phase2Questions: Question[] = [
     id: 11,
     phase: 2,
     type: 'single',
-    question: '혼자 쓸 건가요, 같이?',
-    icon: 'users',
+    question: 'AI에게 원하는 정보는?',
+    icon: 'radar',
     optionA: {
-      text: '혼자',
-      sub: '개인 용도로만',
-      icon: 'user',
+      text: '최신 뉴스 · 트렌드',
+      sub: '실시간 핫한 정보!',
+      icon: 'trending-up',
     },
     optionB: {
-      text: '팀 · 회사에서',
-      sub: '동료와 함께 활용',
-      icon: 'users',
+      text: '검증된 정확한 답변',
+      sub: '출처와 근거가 중요',
+      icon: 'shield-check',
     },
-    practicalField: 'collaboration',
+    optionC: {
+      text: '독창적 기획 · 아이디어',
+      sub: '창의적 브레인스토밍',
+      icon: 'lightbulb',
+    },
+    practicalField: 'infoStyle',
   },
   {
     id: 12,

@@ -1,5 +1,5 @@
 import { phase1Questions, type Question } from '../data/questions';
-import { resultTypes, aiServices, type ResultType } from '../data/results';
+import { resultTypes, aiServices, usageToCategoryMap, type ResultType } from '../data/results';
 import { buildPlans, type PlanTier } from '../data/plans';
 
 export interface Scores {
@@ -14,8 +14,9 @@ export interface PracticalProfile {
   frequency: 'occasional' | 'daily' | 'heavy';
   priority: 'cost' | 'time' | 'quality';
   device: 'mobile' | 'desktop' | 'both';
-  collaboration: 'solo' | 'team';
+  infoStyle: 'trending' | 'verified' | 'creative';
   budget: 'free' | 'low' | 'mid' | 'high';
+  budgetKRW: number;  // 월 예산 한도 (원)
 }
 
 export interface Reasoning {
@@ -87,16 +88,20 @@ export function calculatePhase2(
   const freqMap: Record<string, PracticalProfile['frequency']> = { A: 'occasional', B: 'daily', C: 'heavy' };
   const prioMap: Record<string, PracticalProfile['priority']> = { A: 'cost', B: 'time', C: 'quality' };
   const deviceMap: Record<string, PracticalProfile['device']> = { A: 'mobile', B: 'desktop', C: 'both' };
-  const collabMap: Record<string, PracticalProfile['collaboration']> = { A: 'solo', B: 'team' };
+  const infoMap: Record<string, PracticalProfile['infoStyle']> = { A: 'trending', B: 'verified', C: 'creative' };
   const budgetMap: Record<string, PracticalProfile['budget']> = { A: 'free', B: 'low', C: 'mid', D: 'high' };
+  const budgetKRWMap: Record<string, number> = { A: 0, B: 15000, C: 30000, D: 0 };
+
+  const budgetAnswer = answers.get(12) ?? 'A';
 
   return {
     usageNeeds,
     frequency: freqMap[answers.get(8) ?? 'A'] ?? 'occasional',
     priority: prioMap[answers.get(9) ?? 'A'] ?? 'cost',
     device: deviceMap[answers.get(10) ?? 'C'] ?? 'both',
-    collaboration: collabMap[answers.get(11) ?? 'A'] ?? 'solo',
-    budget: budgetMap[answers.get(12) ?? 'A'] ?? 'free',
+    infoStyle: infoMap[answers.get(11) ?? 'B'] ?? 'verified',
+    budget: budgetMap[budgetAnswer] ?? 'free',
+    budgetKRW: budgetKRWMap[budgetAnswer] ?? 0,
   };
 }
 
@@ -115,18 +120,33 @@ export function calculateResult(
   if (flags.has('coding')) practical.usageNeeds.add('coding');
   if (flags.has('research')) practical.usageNeeds.add('research');
 
+  // 유형은 재미 라벨용으로 유지
   const type = findBestMatch(scores);
-  const reasonings = generateReasonings(type, scores, practical, flags);
-  const insightSummary = type.insights.summary;
+
+  // ★ 새 로직: 적합도 기반 서비스 선택
+  const selectedServices = selectRecommendedServices(scores, practical);
+  const mainLLMKey = selectedServices.mainLLM;
+  const extraKeys = selectedServices.extras.map(s => s.key);
+
+  const reasonings = generateReasonings(selectedServices, scores, practical);
+
+  // Build insight that bridges personality → actual mainLLM (prevents message mismatch)
+  const mainReasoning = reasonings[0];
+  const mainSvc = aiServices[mainLLMKey];
+  const insightSummary = mainReasoning?.traitMatch
+    ? `${mainReasoning.traitMatch} 성향인 당신에게는 ${mainSvc?.name}이(가) 딱 맞아요. ${mainReasoning.headline}`
+    : mainReasoning?.headline
+    ? `당신의 소울메이트 AI는 ${mainSvc?.name}이에요. ${mainReasoning.headline}`
+    : type.insights.summary;
 
   const plans = buildPlans(
-    type.mainLLM,
-    type.secondaryLLM,
-    getExtraKeys(type, flags),
+    mainLLMKey,
+    extraKeys,
     practical.usageNeeds,
+    practical.budgetKRW,
   );
 
-  const recommendedTier = determineRecommendedTier(practical);
+  const recommendedTier = determineRecommendedTier(practical, plans);
 
   return {
     type,
@@ -141,129 +161,225 @@ export function calculateResult(
 }
 
 /**
- * Generate personalized reasoning for each recommended AI
+ * ★ 핵심: 적합도 기반 서비스 선택
  */
-function generateReasonings(
-  type: ResultType,
+interface ServiceScore { key: string; score: number; }
+interface SelectedServices {
+  mainLLM: string;
+  secondaryLLM: string;
+  extras: ServiceScore[];
+}
+
+function computeServiceFitness(
+  serviceKey: string,
   scores: Scores,
   practical: PracticalProfile,
-  flags: Set<string>,
+): number {
+  const svc = aiServices[serviceKey];
+  if (!svc) return -Infinity;
+  const fp = svc.fitProfile;
+
+  // 1. 성향 매치: 4축 내적 (코사인 유사도 근사)
+  let traitScore =
+    scores.speed_depth * fp.speed_depth +
+    scores.real_creative * fp.real_creative +
+    scores.logic_visual * fp.logic_visual +
+    scores.plan_flow * fp.plan_flow;
+
+  // 2. 예산 적합도 — soft penalty + hard block based on actual KRW cost
+  const USD_TO_KRW = 1400;
+  const minCostKRW = Math.min(...svc.tiers.map(t => t.priceUSD)) * USD_TO_KRW;
+  const userBudgetKRW = practical.budgetKRW;  // 0 means no budget set
+
+  const budgetOrder = { free: 0, budget: 1, premium: 2 };
+  const userBudgetLevel = practical.budget === 'free' ? 0 : practical.budget === 'low' ? 1 : practical.budget === 'mid' ? 1 : 2;
+  if (budgetOrder[fp.budgetTier] > userBudgetLevel) {
+    traitScore -= 0.5; // soft penalty
+  }
+  // Hard penalty: if cheapest tier exceeds user's KRW budget, this service is effectively unaffordable
+  if (userBudgetKRW > 0 && minCostKRW > userBudgetKRW) {
+    traitScore -= 1.5;
+  }
+  if (practical.budget === 'free' && fp.budgetTier === 'free') {
+    traitScore += 0.2; // 무료 보너스
+  }
+
+  // 3. 우선순위 보정 (Q9)
+  if (practical.priority === 'cost' && fp.budgetTier === 'free') traitScore += 0.15;
+  if (practical.priority === 'quality' && fp.budgetTier === 'premium') traitScore += 0.15;
+  if (practical.priority === 'time' && scores.speed_depth < 0) traitScore += 0.1;
+
+  // 4. 빈도 보정 (Q8)
+  if (practical.frequency === 'heavy' && fp.budgetTier !== 'free') traitScore += 0.1;
+  if (practical.frequency === 'occasional' && fp.budgetTier === 'free') traitScore += 0.1;
+
+  // 5. 기기 적합도 (Q10)
+  if (practical.device === 'mobile' && fp.deviceFit === 'desktop') traitScore -= 0.15;
+  if (practical.device === 'desktop' && fp.deviceFit === 'mobile') traitScore -= 0.1;
+
+  // 6. 정보 신선도 (Q11)
+  if (practical.infoStyle === 'trending' && fp.infoFreshness === 'trending') traitScore += 0.2;
+  if (practical.infoStyle === 'verified' && fp.infoFreshness === 'verified') traitScore += 0.2;
+  if (practical.infoStyle === 'creative' && fp.infoFreshness === 'creative') traitScore += 0.2;
+  // 불일치 페널티
+  if (practical.infoStyle !== 'creative' && fp.infoFreshness !== 'neutral' && practical.infoStyle !== fp.infoFreshness) traitScore -= 0.1;
+  if (practical.infoStyle === 'creative' && (fp.infoFreshness === 'trending' || fp.infoFreshness === 'verified')) traitScore -= 0.05;
+
+  return traitScore;
+}
+
+function selectRecommendedServices(
+  scores: Scores,
+  practical: PracticalProfile,
+): SelectedServices {
+  // 모든 서비스의 적합도 계산
+  const allScores: ServiceScore[] = Object.keys(aiServices).map(key => ({
+    key,
+    score: computeServiceFitness(key, scores, practical),
+  }));
+
+  // LLM 선택: LLM 카테고리에서 top 2
+  const llmScores = allScores
+    .filter(s => aiServices[s.key].category === 'llm')
+    .sort((a, b) => b.score - a.score);
+  const mainLLM = llmScores[0]?.key || 'chatgpt';
+  const secondaryLLM = llmScores[1]?.key || 'gemini';
+
+  // Q7 usageNeeds → 허용 카테고리 집합 (LLM 제외)
+  const allowedCategories = new Set<string>();
+  for (const need of practical.usageNeeds) {
+    const cats = usageToCategoryMap[need];
+    if (cats) cats.forEach(c => allowedCategories.add(c));
+  }
+  // LLM 카테고리는 별도로 처리했으므로 제거
+  allowedCategories.delete('llm');
+
+  // 비-LLM 서비스: 허용 카테고리에 해당하는 것만 → 카테고리별 top 1
+  const categoryBest = new Map<string, ServiceScore>();
+  for (const s of allScores) {
+    const svc = aiServices[s.key];
+    if (svc.category === 'llm') continue;
+    if (!allowedCategories.has(svc.category)) continue;
+    // usageCategories가 사용자의 usageNeeds와 교집합이 있어야 함
+    const hasMatchingNeed = svc.usageCategories.some(uc => practical.usageNeeds.has(uc));
+    if (!hasMatchingNeed) continue;
+
+    const existing = categoryBest.get(svc.category);
+    if (!existing || s.score > existing.score) {
+      categoryBest.set(svc.category, s);
+    }
+  }
+
+  // Hard budget accumulator: only recommend extras that fit within remaining budget
+  const USD_TO_KRW_SELECT = 1400;
+  const getMinCostKRW = (key: string): number => {
+    const s = aiServices[key];
+    if (!s) return 0;
+    return Math.round(Math.min(...s.tiers.map(t => t.priceUSD)) * USD_TO_KRW_SELECT);
+  };
+
+  let remainingBudget = practical.budgetKRW > 0
+    ? practical.budgetKRW - getMinCostKRW(mainLLM) - getMinCostKRW(secondaryLLM)
+    : Infinity;
+
+  const budgetedExtras: ServiceScore[] = [];
+  const sortedExtras = [...categoryBest.values()].sort((a, b) => b.score - a.score);
+  for (const extra of sortedExtras) {
+    const cost = getMinCostKRW(extra.key);
+    if (cost <= remainingBudget) {
+      budgetedExtras.push(extra);
+      remainingBudget -= cost;
+    }
+    // over-budget extras are silently dropped from recommendations
+  }
+
+  return { mainLLM, secondaryLLM, extras: budgetedExtras };
+}
+
+/**
+ * Generate personalized reasoning for fitness-selected services
+ */
+function generateReasonings(
+  selected: SelectedServices,
+  scores: Scores,
+  practical: PracticalProfile,
 ): Reasoning[] {
   const reasonings: Reasoning[] = [];
   const dominantTraits = getDominantTraits(scores);
 
-  // 1. Main LLM — 성향 매치
-  const mainSvc = aiServices[type.mainLLM];
-  const mainTraitMatch = findTraitMatch(type.mainLLM, dominantTraits);
+  // 1. Main LLM
+  const mainSvc = aiServices[selected.mainLLM];
+  const mainTraitMatch = findTraitMatch(selected.mainLLM, dominantTraits);
   reasonings.push({
-    serviceKey: type.mainLLM,
+    serviceKey: selected.mainLLM,
     serviceName: mainSvc.name,
     serviceIcon: mainSvc.icon,
     tag: '성향 매치',
     tagIcon: 'heart',
-    headline: type.insights.mainLLMReason,
-    reason: mainTraitMatch.reason,
+    headline: mainTraitMatch.reason || mainSvc.description,
+    reason: `당신의 성향에 가장 잘 맞는 AI`,
     traitMatch: mainTraitMatch.label,
     price: mainSvc.priceLabel,
   });
 
-  // 2. Secondary LLM — 보조 AI
-  const secSvc = aiServices[type.secondaryLLM];
+  // 2. Secondary LLM
+  const secSvc = aiServices[selected.secondaryLLM];
   reasonings.push({
-    serviceKey: type.secondaryLLM,
+    serviceKey: selected.secondaryLLM,
     serviceName: secSvc.name,
     serviceIcon: secSvc.icon,
     tag: '보조 AI',
     tagIcon: 'plus-circle',
-    headline: type.insights.secondaryLLMReason,
-    reason: getSecondaryReason(type.secondaryLLM, practical),
+    headline: getSecondaryReason(selected.secondaryLLM, practical),
+    reason: `메인 AI의 부족한 부분을 보완`,
     price: secSvc.priceLabel,
   });
 
-  // 3. Usage-based extras — 용도 매치
-  const usageCategoryMap: Record<string, { cat: string; label: string }> = {
-    writing: { cat: 'llm', label: '글쓰기 용도' },
-    image: { cat: 'image', label: '이미지 만들기' },
-    coding: { cat: 'coding', label: '코딩 용도' },
-    research: { cat: 'research', label: '리서치 용도' },
-    media: { cat: 'video', label: '영상/음악 만들기' },
-    automation: { cat: 'automation', label: '자동화 용도' },
+  // 3. Extras — 적합도 순 (이미 카테고리별 top 1만)
+  const needLabels: Record<string, string> = {
+    writing: '글쓰기·번역',
+    image: '이미지 생성',
+    coding: '코딩·개발',
+    research: '리서치·검색',
+    media: '영상·음악',
+    automation: '업무 자동화',
   };
 
-  const addedKeys = new Set([type.mainLLM, type.secondaryLLM]);
+  for (const extra of selected.extras) {
+    const svc = aiServices[extra.key];
+    if (!svc) continue;
+    // 해당 서비스가 응답하는 usage need 중 사용자가 선택한 것
+    const matchedNeed = svc.usageCategories.find(uc => practical.usageNeeds.has(uc));
+    const label = matchedNeed ? (needLabels[matchedNeed] || matchedNeed) : svc.category;
+    const strengthText = Object.values(svc.strengths)[0] || svc.description;
 
-  for (const [needKey, info] of Object.entries(usageCategoryMap)) {
-    if (!practical.usageNeeds.has(needKey)) continue;
-    const extrasInCat = type.recommendedExtras[info.cat];
-    if (!extrasInCat || extrasInCat.length === 0) continue;
-
-    for (const serviceKey of extrasInCat) {
-      if (addedKeys.has(serviceKey)) continue;
-      addedKeys.add(serviceKey);
-      const svc = aiServices[serviceKey];
-      if (!svc) continue;
-
-      const usageReason = getUsageReason(serviceKey, needKey, practical);
-      reasonings.push({
-        serviceKey,
-        serviceName: svc.name,
-        serviceIcon: svc.icon,
-        tag: '용도 매치',
-        tagIcon: 'target',
-        headline: `${info.label}에 관심 있다고 했죠?`,
-        reason: usageReason,
-        price: svc.priceLabel,
-      });
-    }
-  }
-
-  // 4. Flag-based extras not yet added
-  if (flags.has('music') && !addedKeys.has('suno')) {
-    addedKeys.add('suno');
     reasonings.push({
-      serviceKey: 'suno',
-      serviceName: aiServices.suno.name,
-      serviceIcon: aiServices.suno.icon,
-      tag: '성향 매치',
-      tagIcon: 'heart',
-      headline: '음악에 관심이 많은 당신에게',
-      reason: '노래방 마이크를 독차지하는 당신, 나만의 곡을 만들어보세요',
-      price: aiServices.suno.priceLabel,
+      serviceKey: extra.key,
+      serviceName: svc.name,
+      serviceIcon: svc.icon,
+      tag: '용도 매치',
+      tagIcon: 'target',
+      headline: `${label}에 관심 있다고 했죠?`,
+      reason: strengthText,
+      price: svc.priceLabel,
     });
-  }
-
-  // 5. Budget-optimized suggestion
-  if (practical.priority === 'cost' || practical.budget === 'free') {
-    const freeLLM = type.mainLLM === 'gemini' ? 'gemini' : 'gemini';
-    if (!addedKeys.has('budget_tip')) {
-      reasonings.push({
-        serviceKey: freeLLM,
-        serviceName: '무료 조합 팁',
-        serviceIcon: 'piggy-bank',
-        tag: '예산 최적',
-        tagIcon: 'coins',
-        headline: '비용 절약을 원한다면?',
-        reason: `${aiServices.gemini.name} 무료 티어로 시작하고, 부족할 때만 유료 전환!`,
-        price: '₩0',
-      });
-    }
   }
 
   return reasonings;
 }
 
-function getDominantTraits(scores: Scores): { axis: string; direction: string; strength: number }[] {
-  const traits: { axis: string; direction: string; strength: number }[] = [];
+function getDominantTraits(scores: Scores): { axis: string; direction: string; strength: number; value: number }[] {
+  const traits: { axis: string; direction: string; strength: number; value: number }[] = [];
   for (const [axis, value] of Object.entries(scores)) {
     const labels = traitLabels[axis];
     if (!labels) continue;
     const direction = value < 0 ? labels[0].split(' ')[0] : labels[1].split(' ')[0];
-    traits.push({ axis, direction, strength: Math.abs(value) });
+    traits.push({ axis, direction, strength: Math.abs(value), value });
   }
   return traits.sort((a, b) => b.strength - a.strength);
 }
 
-function findTraitMatch(serviceKey: string, dominantTraits: { axis: string; direction: string; strength: number }[]): { reason: string; label: string } {
+function findTraitMatch(serviceKey: string, dominantTraits: { axis: string; direction: string; strength: number; value: number }[]): { reason: string; label: string } {
   const svc = aiServices[serviceKey];
   if (!svc) return { reason: '', label: '' };
 
@@ -275,16 +391,16 @@ function findTraitMatch(serviceKey: string, dominantTraits: { axis: string; dire
       if (axisKeys.includes(sk)) {
         const pct = Math.round(trait.strength * 100);
         const labels = traitLabels[trait.axis];
+        const dirLabel = labels ? (trait.value < 0 ? labels[0] : labels[1]) : trait.direction;
         const matchText = svc.strengths[sk as keyof typeof svc.strengths];
         return {
           reason: matchText || '',
-          label: `${labels ? (trait.strength > 0 ? labels[1] : labels[0]) : trait.direction} ${pct}%`,
+          label: `${dirLabel} ${pct}%`,
         };
       }
     }
   }
 
-  // Fallback
   const firstStrength = Object.values(svc.strengths)[0];
   return { reason: firstStrength || svc.description, label: '' };
 }
@@ -303,36 +419,24 @@ function getSecondaryReason(serviceKey: string, practical: PracticalProfile): st
   return firstStrength || svc.description;
 }
 
-function getUsageReason(serviceKey: string, _needKey: string, practical: PracticalProfile): string {
-  const svc = aiServices[serviceKey];
-  if (!svc) return '';
+function determineRecommendedTier(p: PracticalProfile, plans: PlanTier[]): 'free' | 'standard' | 'pro' {
+  if (p.budgetKRW === 0) return 'free';
 
-  const freqText = practical.frequency === 'heavy' ? '매일 쓴다면 유료가 효율적' :
-    practical.frequency === 'daily' ? '자주 쓰면 유료도 고려해보세요' :
-      '가끔 쓰면 무료로도 충분';
-
-  const strengthText = Object.values(svc.strengths)[0] || svc.description;
-  return `${strengthText} — ${freqText}`;
-}
-
-function determineRecommendedTier(p: PracticalProfile): 'free' | 'standard' | 'pro' {
-  if (p.budget === 'free') return 'free';
-  if (p.frequency === 'heavy' && p.priority === 'quality') return 'pro';
-  if (p.budget === 'high') return 'pro';
-  if (p.frequency === 'daily' || p.priority === 'time') return 'standard';
-  if (p.budget === 'mid') return 'standard';
-  if (p.frequency === 'occasional' && p.priority === 'cost') return 'free';
-  return 'standard';
-}
-
-function getExtraKeys(type: ResultType, flags: Set<string>): string[] {
-  const keys: string[] = [];
-  for (const serviceKeys of Object.values(type.recommendedExtras)) {
-    keys.push(...serviceKeys);
+  const planCosts = new Map<string, number>();
+  for (const plan of plans) {
+    planCosts.set(plan.id, plan.costKRW);
   }
-  if (flags.has('music') && !keys.includes('suno')) keys.push('suno');
-  if (flags.has('coding') && !keys.includes('cursor')) keys.push('cursor');
-  return [...new Set(keys)];
+
+  const stdCost = planCosts.get('standard') ?? Infinity;
+  const proCost = planCosts.get('pro') ?? Infinity;
+
+  if (proCost <= p.budgetKRW && (p.frequency === 'heavy' || p.priority === 'quality')) {
+    return 'pro';
+  }
+  if (stdCost <= p.budgetKRW) {
+    return 'standard';
+  }
+  return 'free';
 }
 
 function applyScoring(scores: Scores, q: Question, answer: string): void {

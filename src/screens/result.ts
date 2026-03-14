@@ -1,28 +1,40 @@
 import { createElement, icons } from 'lucide';
-import { type QuizResult, type Reasoning } from '../engine/scoring';
-import { type PlanTier, freeEnoughItems } from '../data/plans';
+import { type QuizResult } from '../engine/scoring';
 import { aiServices } from '../data/results';
-
-function toPascalCase(name: string): string {
-  return name
-    .split('-')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join('');
-}
+import { injectIcon } from '../utils/icons';
+import { handleShareCard } from './share-card';
 
 export function renderResult(result: QuizResult, onRestart: () => void): HTMLElement {
   const el = document.createElement('div');
   el.className = 'screen screen-result';
 
-  const { type, scores, plans, recommendedTier, reasonings, insightSummary } = result;
+  const { type, scores, reasonings, insightSummary } = result;
+
+  const mainReasoning = reasonings[0];
+  const recommendedKeys = new Set(reasonings.map(r => r.serviceKey));
+  const mainSvc = aiServices[mainReasoning?.serviceKey || type.mainLLM];
+
 
   el.innerHTML = `
     <div class="result-content">
-      <!-- Hero -->
+      <!-- Hero (unchanged) -->
       <div class="result-hero" style="--accent: ${type.color}">
         <div class="result-illustration" id="result-illustration">
-          <div class="illustration-placeholder result-illust">
-            <span class="illustration-label">일러스트 영역</span>
+          <div class="illust-sparkle-wrap">
+            <img
+              class="result-illust-img"
+              src="/assets/${type.id}.jpg"
+              alt="${type.name} 캐릭터"
+              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+            >
+            <div class="illustration-placeholder result-illust" style="display:none">
+              <span class="illustration-label">일러스트 영역</span>
+            </div>
+            <span class="sparkle s1"></span>
+            <span class="sparkle s2"></span>
+            <span class="sparkle s3"></span>
+            <span class="sparkle s4"></span>
+            <span class="sparkle s5"></span>
           </div>
         </div>
         <h1 class="result-type-name">${type.name}</h1>
@@ -33,7 +45,7 @@ export function renderResult(result: QuizResult, onRestart: () => void): HTMLEle
         </div>
       </div>
 
-      <!-- Trait Chart -->
+      <!-- Trait Chart (unchanged) -->
       <div class="result-chart-section">
         <h2 class="section-title">나의 AI 성향</h2>
         <div class="trait-bars">
@@ -44,42 +56,136 @@ export function renderResult(result: QuizResult, onRestart: () => void): HTMLEle
         </div>
       </div>
 
-      <!-- Insight Summary -->
+      <!-- Insight (unchanged) -->
       <div class="insight-banner">
         <span class="insight-icon" id="insight-icon"></span>
         <p class="insight-text">${insightSummary}</p>
       </div>
 
-      <!-- Personalized Reasoning Cards -->
-      <div class="reasoning-section">
-        <h2 class="section-title">당신을 위한 AI 조합</h2>
-        <div class="reasoning-cards">
-          ${reasonings.map((r, i) => renderReasoningCard(r, i)).join('')}
-        </div>
-      </div>
+      <!-- ★ NEW: AI Soulmate Section -->
+      <div class="soulmate-section">
+        <h2 class="section-title"><span class="section-icon" id="section-soulmate-icon"></span> 당신의 AI 소울메이트</h2>
 
-      <!-- 3-Tier Plan Comparison -->
-      <div class="result-plans">
-        <h2 class="section-title">맞춤 AI 플랜</h2>
-        <div class="plan-cards">
-          ${plans.map((plan) => renderPlanCard(plan, plan.id === recommendedTier)).join('')}
-        </div>
-      </div>
-
-      <!-- Free-enough Section -->
-      <div class="result-free-section">
-        <h2 class="section-title">💡 무료로도 충분한 것들</h2>
-        <div class="free-items">
-          ${freeEnoughItems.map((item, i) => `
-            <div class="free-item">
-              <span class="free-item-icon" id="free-icon-${i}"></span>
-              <div class="free-item-info">
-                <span class="free-item-name">${item.name}</span>
-                <span class="free-item-reason">${item.reason}</span>
-              </div>
+        <!-- Main LLM — big hero card -->
+        <div class="soulmate-main" id="soulmate-main-card"
+          data-svc-key="${mainReasoning?.serviceKey || type.mainLLM}"
+          data-selected-price="${mainSvc.tiers[0]?.priceUSD ?? 0}">
+          <div class="soulmate-main-header">
+          ${{chatgpt:'/assets/chatgpt.svg',gemini:'/assets/gemini.svg.png',claude:'/assets/claude.svg',grok:'/assets/grok.svg'}[mainReasoning?.serviceKey || ''] ?
+             `<img class="soulmate-main-logo" src="${{chatgpt:'/assets/chatgpt.svg',gemini:'/assets/gemini.svg.png',claude:'/assets/claude.svg',grok:'/assets/grok.svg'}[mainReasoning?.serviceKey || '']}" alt="${mainSvc.name}">` :
+             `<span class="soulmate-main-icon" id="soulmate-main-icon"></span>`}
+            <div class="soulmate-main-info">
+              <span class="soulmate-main-name">${mainSvc.name}</span>
+              <span class="soulmate-main-desc">${mainSvc.description}</span>
             </div>
-          `).join('')}
+          </div>
+          <p class="soulmate-main-reason">${mainReasoning?.headline || type.insights.mainLLMReason}</p>
+          ${mainReasoning?.traitMatch ? `<span class="soulmate-trait-badge">${mainReasoning.traitMatch}</span>` : ''}
+          <div class="soulmate-main-plan-row">
+            ${mainSvc.tiers.length > 1 ? `
+              <div class="soulmate-plan-tiers">
+                ${mainSvc.tiers.map((t, ti) => {
+                  const krw = t.priceUSD * 1400;
+                  const label = t.priceUSD === 0 ? t.name : `${t.name} ₩${krw.toLocaleString()}`;
+                  return `<button class="picker-tier-btn soulmate-tier-btn${ti === 0 ? ' active' : ''}" data-tier-price="${t.priceUSD}" data-tier-idx="${ti}" data-svc-key="${mainReasoning?.serviceKey || type.mainLLM}">${label}</button>`;
+                }).join('')}
+              </div>` : `<span class="picker-item-price">${mainSvc.tiers[0]?.priceUSD === 0 ? '무료' : `₩${(mainSvc.tiers[0].priceUSD * 1400).toLocaleString()}/월`}</span>`
+            }
+            ${mainSvc.pricingUrl ? `<a class="picker-pricing-link inline" href="${mainSvc.pricingUrl}" target="_blank" rel="noopener">가격표</a>` : ''}
+          </div>
         </div>
+
+        <!-- Secondary LLM label only — picker follows directly -->
+        <div class="soulmate-secondary">
+          <div class="soulmate-sec-label">+ 같이 쓰면 좋아요</div>
+        </div>
+      </div>
+
+      <!-- ★ AI Service Picker — directly under label -->
+      <div class="start-section">
+        <div class="picker-grid" id="picker-grid">
+          ${Object.entries(aiServices)
+            // 1. 소울메이트(메인 LLM) 제외
+            .filter(([key]) => key !== mainReasoning?.serviceKey)
+            .sort(([keyA], [keyB]) => {
+              const aRec = recommendedKeys.has(keyA) ? 1 : 0;
+              const bRec = recommendedKeys.has(keyB) ? 1 : 0;
+              return bRec - aRec;
+            })
+            .map(([key, svc], si) => {
+            const isRecommended = recommendedKeys.has(key);
+            const tiers = svc.tiers;
+            const groupSiblings = svc.planGroup
+              ? Object.entries(aiServices)
+                  .filter(([k, s]) => s.planGroup === svc.planGroup && k !== key)
+                  .map(([, s]) => s.name)
+              : [];
+            const groupNote = groupSiblings.length > 0
+              ? `<span class="plan-group-note">${groupSiblings.join(' / ')} 포함</span>`
+              : '';
+            // 5. 공식 로고 (4대 LLM)
+            const logoMap: Record<string, string> = {
+              chatgpt: '/assets/chatgpt.svg',
+              gemini: '/assets/gemini.svg.png',
+              claude: '/assets/claude.svg',
+              grok: '/assets/grok.svg',
+            };
+            const logoUrl = logoMap[key];
+            const iconHtml = logoUrl
+              ? `<img class="picker-item-logo" src="${logoUrl}" alt="${svc.name}">`
+              : `<span class="picker-item-icon" id="picker-icon-${si}"></span>`;
+            return `
+              <div class="picker-item${isRecommended ? ' checked' : ''}" data-key="${key}" data-selected-price="0" data-plan-group="${svc.planGroup || ''}" data-bundle-note="${svc.bundleNote || ''}" style="animation-delay: ${si * 0.02}s">
+                ${iconHtml}
+                <div class="picker-item-info">
+                  <div class="picker-item-name-row">
+                    <span class="picker-item-name">${svc.name}</span>
+                    ${(!svc.bundleNote && svc.pricingUrl) ? `<a class="picker-pricing-link inline" href="${svc.pricingUrl}" target="_blank" rel="noopener" title="가격표 보기">가격표</a>` : ''}
+                  </div>
+                  ${svc.bundleNote ? `
+                    <span class="plan-group-note">${svc.bundleNote}</span>
+                  ` : tiers.length > 1 ? `
+                    <div class="picker-tier-toggle">
+                      ${tiers.map((t, ti) => {
+                        const krw = t.priceKRW ?? Math.round(t.priceUSD * 1400);
+                        const label = krw === 0 ? t.name : `${t.name} ₩${krw.toLocaleString()}`;
+                        const isDefault = ti === 0;
+                        return `<button class="picker-tier-btn${isDefault ? ' active' : ''}" data-tier-price="${t.priceUSD}" data-tier-krw="${krw}" data-tier-idx="${ti}">${label}</button>`;
+                      }).join('')}
+                    </div>
+                    ${groupNote}
+                  ` : `
+                    <span class="picker-item-price">${(() => { const krw = tiers[0]?.priceKRW ?? Math.round((tiers[0]?.priceUSD || 0) * 1400); return krw === 0 ? '무료' : `₩${krw.toLocaleString()}/월`; })()}</span>
+                  `}
+                </div>
+                <span class="picker-check"></span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+
+
+      <!-- 계산서 영역 (share 버튼 바로 위) -->
+      <div class="budget-receipt" id="budget-receipt">
+        <div class="receipt-title"><span class="receipt-title-icon" id="receipt-title-icon"></span> 예산 계산서</div>
+        <div class="receipt-rows" id="receipt-rows"></div>
+        <div class="receipt-divider"></div>
+        <div class="receipt-total">
+          <span class="receipt-total-label">합계</span>
+          <span class="receipt-total-amount" id="receipt-total-amount">₩0</span>
+        </div>
+        ${result.practical.budgetKRW > 0 ? `
+        <div class="receipt-budget-row">
+          <span class="receipt-budget-label">예산</span>
+          <span class="receipt-budget-amount">₩${result.practical.budgetKRW.toLocaleString()}</span>
+        </div>
+        <div class="picker-budget-track" style="margin-top:8px">
+          <div class="picker-budget-fill" id="picker-budget-fill" style="width: 0%"></div>
+        </div>
+        <div class="receipt-status" id="receipt-status"></div>
+        ` : ''}
       </div>
 
       <!-- Actions -->
@@ -96,26 +202,237 @@ export function renderResult(result: QuizResult, onRestart: () => void): HTMLEle
 
   requestAnimationFrame(() => {
     injectIcon(el, 'percentage-icon', 'users');
+    injectIcon(el, 'section-soulmate-icon', 'crosshair');
     injectIcon(el, 'insight-icon', 'sparkles');
 
-    // Reasoning card icons
-    reasonings.forEach((r, i) => {
-      injectIcon(el, `rc-icon-${i}`, r.serviceIcon);
-      injectIcon(el, `rc-tag-icon-${i}`, r.tagIcon);
-    });
+    injectIcon(el, 'soulmate-main-icon', mainSvc.icon);
+    injectIcon(el, 'receipt-title-icon', 'receipt');
+    // secondary no longer rendered as a card
 
-    // Plan icons
-    plans.forEach((plan, pi) => {
-      injectIcon(el, `plan-llm-icon-${pi}`, aiServices[plan.mainLLM]?.icon || 'bot');
-      plan.extras.forEach((_extra, ei) => {
-        injectIcon(el, `plan-extra-icon-${pi}-${ei}`, aiServices[_extra.serviceKey]?.icon || 'circle');
+    // Picker service icons — MUST match exact filter+sort order as HTML rendering
+    const mainSvcKey = mainReasoning?.serviceKey;
+    const serviceEntries = Object.entries(aiServices)
+      .filter(([key]) => key !== mainSvcKey)
+      .sort(([keyA], [keyB]) => {
+        const aRec = recommendedKeys.has(keyA) ? 1 : 0;
+        const bRec = recommendedKeys.has(keyB) ? 1 : 0;
+        return bRec - aRec;
       });
+    serviceEntries.forEach(([, svc], si) => {
+      injectIcon(el, `picker-icon-${si}`, svc.icon);
     });
 
-    // Free section icons
-    freeEnoughItems.forEach((item, i) => {
-      injectIcon(el, `free-icon-${i}`, item.icon);
-    });
+    // Picker interactivity
+    const budgetKRW = result.practical.budgetKRW;
+    const USD_TO_KRW = 1400;
+    const pickerGrid = el.querySelector('#picker-grid');
+    if (pickerGrid) {
+      // Initialize selected prices
+      pickerGrid.querySelectorAll('.picker-item').forEach(item => {
+        const el = item as HTMLElement;
+        const activeBtn = el.querySelector('.picker-tier-btn.active') as HTMLElement;
+        if (activeBtn) {
+          el.dataset.selectedPrice = activeBtn.dataset.tierPrice || '0';
+        } else {
+          // Single-tier: use its price
+          const svcKey = el.dataset.key || '';
+          const svc = aiServices[svcKey];
+          el.dataset.selectedPrice = svc?.tiers[0]?.priceUSD?.toString() || '0';
+        }
+      });
+
+      // Helper: sync plan group siblings
+      const syncPlanGroup = (sourceItem: HTMLElement, checked: boolean, tierIdx?: string) => {
+        const group = sourceItem.dataset.planGroup;
+        if (!group) return;
+        pickerGrid.querySelectorAll(`.picker-item[data-plan-group="${group}"]`).forEach(sibling => {
+          const sib = sibling as HTMLElement;
+          if (sib === sourceItem) return;
+          if (checked) {
+            if (!sib.classList.contains('checked')) sib.classList.add('checked');
+            // Sync tier selection if specified
+            if (tierIdx !== undefined) {
+              const sibBtn = sib.querySelector(`.picker-tier-btn[data-tier-idx="${tierIdx}"]`) as HTMLElement;
+              if (sibBtn) {
+                sib.querySelectorAll('.picker-tier-btn').forEach(b => b.classList.remove('active'));
+                sibBtn.classList.add('active');
+                sib.dataset.selectedPrice = sibBtn.dataset.tierPrice || '0';
+              }
+            }
+          } else {
+            sib.classList.remove('checked');
+          }
+        });
+      };
+
+      const recalc = () => {
+        let totalUSD = 0;
+        const countedGroups = new Set<string>();
+        const checkedItems: { name: string; krw: number }[] = [];
+
+        pickerGrid.querySelectorAll('.picker-item.checked').forEach(item => {
+          const itemEl = item as HTMLElement;
+          const price = parseFloat(itemEl.dataset.selectedPrice || '0');
+          const group = itemEl.dataset.planGroup;
+          const svcKey = itemEl.dataset.key || '';
+          const svc = aiServices[svcKey];
+
+          if (group) {
+            if (!countedGroups.has(group)) {
+              countedGroups.add(group);
+              let maxPrice = price;
+              pickerGrid.querySelectorAll(`.picker-item.checked[data-plan-group="${group}"]`).forEach(sib => {
+                const sibPrice = parseFloat((sib as HTMLElement).dataset.selectedPrice || '0');
+                if (sibPrice > maxPrice) maxPrice = sibPrice;
+              });
+              totalUSD += maxPrice;
+              checkedItems.push({ name: svc?.name || svcKey, krw: Math.round(maxPrice * USD_TO_KRW) });
+            }
+          } else {
+            totalUSD += price;
+            checkedItems.push({ name: svc?.name || svcKey, krw: Math.round(price * USD_TO_KRW) });
+          }
+        });
+        // Include soulmate in receipt calculation
+        const soulmateCardEl = el.querySelector('#soulmate-main-card') as HTMLElement;
+        if (soulmateCardEl) {
+          const soulmateKey = soulmateCardEl.dataset.svcKey || '';
+          const soulmateSvc = aiServices[soulmateKey];
+          const soulmatePrice = parseFloat(soulmateCardEl.dataset.selectedPrice || '0');
+          checkedItems.unshift({ name: soulmateSvc?.name || soulmateKey, krw: Math.round(soulmatePrice * USD_TO_KRW) });
+          totalUSD += soulmatePrice;
+        }
+
+        const totalKRW = Math.round(totalUSD * USD_TO_KRW);
+
+        // Update receipt rows
+        const receiptRows = el.querySelector('#receipt-rows');
+        if (receiptRows) {
+          if (checkedItems.length === 0) {
+            receiptRows.innerHTML = `<div class="receipt-empty">선택된 서비스가 없어요</div>`;
+          } else {
+            receiptRows.innerHTML = checkedItems.map(item =>
+              `<div class="receipt-row">
+                <span class="receipt-row-name">${item.name}</span>
+                <span class="receipt-row-price${item.krw === 0 ? ' free' : ''}">${item.krw === 0 ? '무료' : `₩${item.krw.toLocaleString()}/월`}</span>
+              </div>`
+            ).join('');
+          }
+        }
+
+        // Update total
+        const totalEl = el.querySelector('#receipt-total-amount');
+        if (totalEl) totalEl.textContent = `₩${totalKRW.toLocaleString()}/월`;
+
+        // Update bar
+        const fill = el.querySelector('#picker-budget-fill') as HTMLElement;
+        if (fill && budgetKRW > 0) {
+          const pct = Math.min((totalKRW / budgetKRW) * 100, 100);
+          fill.style.width = `${pct}%`;
+          fill.style.background = totalKRW > budgetKRW ? '#e85d75' : '#4a9e6b';
+        }
+
+        // Update status
+        const statusEl = el.querySelector('#receipt-status');
+        if (statusEl && budgetKRW > 0) {
+          if (totalKRW > budgetKRW) {
+            const over = totalKRW - budgetKRW;
+            statusEl.textContent = `₩${over.toLocaleString()} 예산 초과`;
+            statusEl.className = 'receipt-status over';
+          } else if (totalKRW > 0) {
+            const rem = budgetKRW - totalKRW;
+            statusEl.textContent = `₩${rem.toLocaleString()} 여유`;
+            statusEl.className = 'receipt-status under';
+          } else {
+            statusEl.textContent = '';
+            statusEl.className = 'receipt-status';
+          }
+        }
+      };
+
+      // Sort via CSS order (no DOM reorder = no flicker)
+      const sortItems = () => {
+        let checkedIdx = 0;
+        let uncheckedIdx = 100;
+        pickerGrid.querySelectorAll('.picker-item').forEach(item => {
+          const el = item as HTMLElement;
+          el.style.order = item.classList.contains('checked') ? String(checkedIdx++) : String(uncheckedIdx++);
+        });
+      };
+
+      // Click handler
+      pickerGrid.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        // Pricing link — let it navigate, don't toggle card
+        if (target.closest('.picker-pricing-link')) return;
+        const tierBtn = target.closest('.picker-tier-btn') as HTMLElement;
+        if (tierBtn) {
+          e.stopPropagation();
+          const item = tierBtn.closest('.picker-item') as HTMLElement;
+          if (!item) return;
+          item.querySelectorAll('.picker-tier-btn').forEach(b => b.classList.remove('active'));
+          tierBtn.classList.add('active');
+          item.dataset.selectedPrice = tierBtn.dataset.tierPrice || '0';
+          if (!item.classList.contains('checked')) item.classList.add('checked');
+          // Auto-link plan group siblings
+          syncPlanGroup(item, true, tierBtn.dataset.tierIdx);
+          recalc();
+          sortItems();
+          return;
+        }
+        const item = target.closest('.picker-item') as HTMLElement;
+        if (item) {
+          const willBeChecked = !item.classList.contains('checked');
+          item.classList.toggle('checked');
+
+          // If a bundled service is checked → auto-upgrade planGroup parent to paid tier
+          if (willBeChecked && item.dataset.bundleNote) {
+            const group = item.dataset.planGroup;
+            if (group) {
+              const parent = pickerGrid.querySelector(
+                `.picker-item[data-plan-group="${group}"][data-bundle-note=""]`
+              ) as HTMLElement | null;
+              if (parent) {
+                parent.classList.add('checked');
+                const activeBtn = parent.querySelector('.picker-tier-btn.active') as HTMLElement | null;
+                const currentIdx = parseInt(activeBtn?.dataset.tierIdx || '0');
+                if (currentIdx === 0) {
+                  const paidBtn = parent.querySelector('.picker-tier-btn[data-tier-idx="1"]') as HTMLElement | null;
+                  if (paidBtn) {
+                    parent.querySelectorAll('.picker-tier-btn').forEach(b => b.classList.remove('active'));
+                    paidBtn.classList.add('active');
+                    parent.dataset.selectedPrice = paidBtn.dataset.tierPrice || '0';
+                  }
+                }
+              }
+            }
+          }
+
+          // Auto-link plan group siblings
+          syncPlanGroup(item, willBeChecked);
+          recalc();
+          sortItems();
+        }
+      });
+
+      sortItems();
+      recalc();
+
+      // Soulmate card tier buttons
+      const soulmateCard = el.querySelector('#soulmate-main-card') as HTMLElement;
+      if (soulmateCard) {
+        soulmateCard.querySelectorAll('.soulmate-tier-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            soulmateCard.querySelectorAll('.soulmate-tier-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            soulmateCard.dataset.selectedPrice = (btn as HTMLElement).dataset.tierPrice || '0';
+            recalc();
+          });
+        });
+      }
+    }
+
 
     // Share
     const shareBtn = el.querySelector('#btn-share');
@@ -123,7 +440,15 @@ export function renderResult(result: QuizResult, onRestart: () => void): HTMLEle
       const shareIcon = createElement(icons.Share2);
       shareIcon.classList.add('btn-icon');
       shareBtn.prepend(shareIcon);
-      shareBtn.addEventListener('click', () => handleShare(type.name, type.description));
+      shareBtn.addEventListener('click', () => {
+        // Collect currently checked service keys from the picker
+        const selectedKeys: string[] = [];
+        el.querySelectorAll('.picker-item.checked').forEach(item => {
+          const key = (item as HTMLElement).dataset.key;
+          if (key) selectedKeys.push(key);
+        });
+        handleShareCard(result, selectedKeys);
+      });
     }
 
     // Restart
@@ -139,76 +464,7 @@ export function renderResult(result: QuizResult, onRestart: () => void): HTMLEle
   return el;
 }
 
-function renderReasoningCard(r: Reasoning, index: number): string {
-  const tagColors: Record<string, string> = {
-    '성향 매치': '#FF8C6B',
-    '용도 매치': '#667EEA',
-    '예산 최적': '#43E97B',
-    '보조 AI': '#A18CD1',
-  };
-  const tagColor = tagColors[r.tag] || '#FF8C6B';
 
-  return `
-    <div class="reasoning-card" style="--tag-color: ${tagColor}; animation-delay: ${index * 0.1}s">
-      <div class="rc-tag">
-        <span class="rc-tag-icon" id="rc-tag-icon-${index}"></span>
-        <span>${r.tag}</span>
-        ${r.traitMatch ? `<span class="rc-trait-badge">${r.traitMatch}</span>` : ''}
-      </div>
-      <div class="rc-body">
-        <div class="rc-service">
-          <span class="rc-service-icon" id="rc-icon-${index}"></span>
-          <span class="rc-service-name">${r.serviceName}</span>
-        </div>
-        <p class="rc-headline">${r.headline}</p>
-        <p class="rc-reason">${r.reason}</p>
-      </div>
-      <div class="rc-footer">
-        <span class="rc-price">${r.price}</span>
-      </div>
-    </div>
-  `;
-}
-
-function renderPlanCard(plan: PlanTier, isRecommended: boolean): string {
-  const llm = aiServices[plan.mainLLM];
-  const tierLabel = { free: '무료', standard: '스탠다드', pro: '프로' }[plan.id];
-
-  return `
-    <div class="plan-card ${plan.id}${isRecommended ? ' recommended' : ''}">
-      ${isRecommended ? '<div class="plan-badge">⭐ 추천</div>' : ''}
-      <div class="plan-header">
-        <span class="plan-tier-name">${tierLabel}</span>
-        <span class="plan-price">${plan.priceLabel}</span>
-        <span class="plan-price-sub">/월</span>
-      </div>
-      <div class="plan-body">
-        <div class="plan-llm">
-          <span class="plan-llm-icon" id="plan-llm-icon-${['free', 'standard', 'pro'].indexOf(plan.id)}"></span>
-          <div class="plan-llm-info">
-            <span class="plan-llm-name">${llm?.name || plan.mainLLM}</span>
-            <span class="plan-llm-tier">${plan.mainLLMTier}</span>
-          </div>
-        </div>
-        ${plan.extras.length > 0 ? `
-          <div class="plan-extras">
-            ${plan.extras.slice(0, 3).map((extra, ei) => {
-              const svc = aiServices[extra.serviceKey];
-              return `
-                <div class="plan-extra-item">
-                  <span class="plan-extra-icon" id="plan-extra-icon-${['free', 'standard', 'pro'].indexOf(plan.id)}-${ei}"></span>
-                  <span class="plan-extra-name">${svc?.name || extra.serviceKey}</span>
-                </div>
-              `;
-            }).join('')}
-            ${plan.extras.length > 3 ? `<span class="plan-extra-more">+${plan.extras.length - 3}개 더</span>` : ''}
-          </div>
-        ` : ''}
-        <p class="plan-target">${plan.targetUser}</p>
-      </div>
-    </div>
-  `;
-}
 
 function renderTraitBar(labelLeft: string, labelRight: string, value: number): string {
   const percent = ((value + 1) / 2) * 100;
@@ -223,25 +479,4 @@ function renderTraitBar(labelLeft: string, labelRight: string, value: number): s
   `;
 }
 
-function injectIcon(root: HTMLElement, id: string, iconName: string): void {
-  const container = root.querySelector(`#${id}`);
-  if (!container) return;
-  const pascalName = toPascalCase(iconName);
-  const iconNode = icons[pascalName as keyof typeof icons];
-  if (iconNode) {
-    const svg = createElement(iconNode);
-    container.appendChild(svg);
-  }
-}
 
-async function handleShare(typeName: string, description: string): Promise<void> {
-  const shareText = `나의 AI 유형: "${typeName}" — ${description}\n\n나에게 맞는 AI는? 테스트 해보기 👉`;
-  if (navigator.share) {
-    try {
-      await navigator.share({ title: '나에게 맞는 AI는?', text: shareText, url: window.location.href });
-    } catch { /* cancelled */ }
-  } else {
-    await navigator.clipboard.writeText(shareText + ' ' + window.location.href);
-    alert('링크가 복사되었습니다!');
-  }
-}

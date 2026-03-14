@@ -9,14 +9,46 @@ export interface AIStrengths {
   flow?: string;
 }
 
+export interface FitProfile {
+  // 4축 적합도: 사용자 점수와 같은 축 (-1~+1)
+  speed_depth: number;      // -1=속도형, +1=깊이형
+  real_creative: number;    // -1=현실형, +1=창작형
+  logic_visual: number;     // -1=논리형, +1=감성형
+  plan_flow: number;        // -1=체계형, +1=즉흥형
+  // 실전 적합도
+  budgetTier: 'free' | 'budget' | 'premium';  // free=무료, budget=₩15K대, premium=₩30K+
+  deviceFit: 'mobile' | 'desktop' | 'both';
+  infoFreshness: 'trending' | 'verified' | 'creative' | 'neutral';
+}
+
+// Q7 usageNeeds → 서비스 카테고리 매핑
+export const usageToCategoryMap: Record<string, string[]> = {
+  writing: ['llm'],
+  image: ['image'],
+  coding: ['coding'],
+  research: ['research'],
+  media: ['music', 'video', 'voice'],
+  automation: ['automation'],
+  casual: ['llm'],
+};
+
 export interface AIService {
   name: string;
   category: 'llm' | 'image' | 'music' | 'video' | 'coding' | 'research' | 'voice' | 'automation';
   description: string;
   priceFree: string;
   priceLabel: string;
+  priceUSD: number;  // 월 유료 구독 기준 USD (무료=0)
   icon: string;
   strengths: AIStrengths;
+  tiers: { name: string; priceUSD: number; priceKRW?: number }[];
+  pricingUrl?: string;
+  planGroup?: string;
+  /** 다른 서비스 플랜에 포함된 경우 표시할 텍스트 */
+  bundleNote?: string;
+  fitProfile: FitProfile;
+  /** Q7의 어떤 usageNeed에 응답하는 서비스인지 */
+  usageCategories: string[];
 }
 
 export const aiServices: Record<string, AIService> = {
@@ -26,25 +58,47 @@ export const aiServices: Record<string, AIService> = {
     description: '만능 선생님 — 뭐든 잘하는 올라운더',
     priceFree: '무료 (제한적)',
     priceLabel: '$20/월 (Plus)',
+    priceUSD: 20,
     icon: 'bot',
     strengths: {
       speed: '빠르고 자연스러운 대화',
       creative: '글쓰기·브레인스토밍에 강함',
       plan: '체계적인 단계별 설명',
     },
+    tiers: [
+      { name: 'Free', priceUSD: 0, priceKRW: 0 },
+      { name: 'Go', priceUSD: 9.3, priceKRW: 13000 },
+      { name: 'Plus', priceUSD: 20.7, priceKRW: 29000 },
+      { name: 'Pro', priceUSD: 213.6, priceKRW: 299000 },
+    ],
+    pricingUrl: 'https://openai.com/chatgpt/pricing/',
+    planGroup: 'chatgpt_plus',
+    fitProfile: { speed_depth: -0.5, real_creative: 0.3, logic_visual: -0.4, plan_flow: -0.3, budgetTier: 'budget', deviceFit: 'both', infoFreshness: 'creative' },
+    usageCategories: ['writing', 'casual'],
   },
   gemini: {
     name: 'Gemini',
     category: 'llm',
     description: '구글 마스터 — 검색과 멀티미디어의 강자',
-    priceFree: '무료 (넉넉)',
-    priceLabel: '$20/월 (Advanced)',
+    priceFree: '무료 (넓넷)',
+    priceLabel: '₩11,000/월 (Plus)',
+    priceUSD: 8,
     icon: 'sparkles',
     strengths: {
       real: '구글 연동, 최신 정보 검색',
       creative: '이미지 생성 내장 (무료!)',
       flow: '다양한 형식 자유롭게 활용',
     },
+    tiers: [
+      { name: 'Free', priceUSD: 0, priceKRW: 0 },
+      { name: 'Plus', priceUSD: 8, priceKRW: 11000 },
+      { name: 'Pro', priceUSD: 21, priceKRW: 29000 },
+      { name: 'Ultra', priceUSD: 257, priceKRW: 360000 },
+    ],
+    pricingUrl: 'https://gemini.google/subscriptions/',
+    planGroup: 'gemini_advanced',
+    fitProfile: { speed_depth: -0.1, real_creative: 0.5, logic_visual: 0.2, plan_flow: 0.3, budgetTier: 'free', deviceFit: 'both', infoFreshness: 'creative' },
+    usageCategories: ['writing', 'casual', 'research'],
   },
   claude: {
     name: 'Claude',
@@ -52,12 +106,17 @@ export const aiServices: Record<string, AIService> = {
     description: '깊은 사색가 — 긴 글과 정밀 분석의 달인',
     priceFree: '무료 (제한적)',
     priceLabel: '$20/월 (Pro)',
+    priceUSD: 20,
     icon: 'brain',
     strengths: {
       depth: '긴 문서도 정밀하게 분석',
       logic: '논리적이고 구조화된 답변',
       plan: '복잡한 작업을 단계별로 분해',
     },
+    tiers: [{ name: 'Free', priceUSD: 0 }, { name: 'Pro', priceUSD: 20 }, { name: 'Max', priceUSD: 100 }],
+    pricingUrl: 'https://www.anthropic.com/pricing',
+    fitProfile: { speed_depth: 0.6, real_creative: 0.0, logic_visual: -0.5, plan_flow: -0.5, budgetTier: 'budget', deviceFit: 'desktop', infoFreshness: 'verified' },
+    usageCategories: ['writing', 'coding', 'research'],
   },
   grok: {
     name: 'Grok',
@@ -65,30 +124,47 @@ export const aiServices: Record<string, AIService> = {
     description: '트렌드 헌터 — 실시간 정보의 최전선',
     priceFree: 'X 프리미엄',
     priceLabel: '$8~16/월',
+    priceUSD: 12,
     icon: 'zap',
     strengths: {
       speed: '가장 빠른 실시간 정보 반영',
       flow: '가볍고 즉흥적인 대화에 강함',
       real: 'X(트위터) 실시간 트렌드 연동',
     },
+    tiers: [{ name: 'Premium', priceUSD: 8 }, { name: 'Premium+', priceUSD: 16 }],
+    pricingUrl: 'https://x.com/en/premium',
+    fitProfile: { speed_depth: -0.5, real_creative: -0.5, logic_visual: 0.2, plan_flow: 0.3, budgetTier: 'budget', deviceFit: 'mobile', infoFreshness: 'trending' },
+    usageCategories: ['casual', 'research'],
   },
   gemini_image: {
-    name: 'Gemini 이미지 (나노 바나나)',
+    name: '나노 바나나',
     category: 'image',
     description: 'Google 생태계 내 무료 이미지 생성',
     priceFree: '무료',
-    priceLabel: '$20/월',
-    icon: 'image',
+    priceLabel: 'Gemini 플러스 이상',
+    priceUSD: 0,
+    icon: 'banana',
     strengths: { creative: '대화 중 바로 생성', flow: '무료로 부담 없이' },
+    tiers: [{ name: 'Gemini 포함', priceUSD: 0, priceKRW: 0 }],
+    planGroup: 'gemini_advanced',
+    bundleNote: 'Gemini 유료 플랜에 포함',
+    fitProfile: { speed_depth: -0.4, real_creative: 0.6, logic_visual: 0.5, plan_flow: 0.5, budgetTier: 'free', deviceFit: 'both', infoFreshness: 'neutral' },
+    usageCategories: ['image'],
   },
   gpt_image: {
     name: 'GPT 이미지',
     category: 'image',
     description: '대화하면서 바로 이미지 생성',
     priceFree: '유료 전용',
-    priceLabel: '$20/월',
+    priceLabel: 'ChatGPT Plus 이상',
+    priceUSD: 0,
     icon: 'image-plus',
     strengths: { creative: '자연스러운 묘사 → 이미지', plan: '수정 요청이 편리' },
+    tiers: [{ name: 'ChatGPT 포함', priceUSD: 0, priceKRW: 0 }],
+    planGroup: 'chatgpt_plus',
+    bundleNote: 'ChatGPT 유료 플랜에 포함',
+    fitProfile: { speed_depth: -0.2, real_creative: 0.5, logic_visual: 0.2, plan_flow: -0.3, budgetTier: 'budget', deviceFit: 'both', infoFreshness: 'neutral' },
+    usageCategories: ['image'],
   },
   midjourney: {
     name: 'Midjourney',
@@ -96,8 +172,13 @@ export const aiServices: Record<string, AIService> = {
     description: '최고 퀄리티 아트워크, 스타일 다양',
     priceFree: '없음',
     priceLabel: '$10~30/월',
+    priceUSD: 20,
     icon: 'palette',
     strengths: { visual: '최고 수준의 아트 퀄리티', depth: '스타일 세밀 조정 가능' },
+    tiers: [{ name: 'Basic', priceUSD: 10 }, { name: 'Standard', priceUSD: 30 }, { name: 'Pro', priceUSD: 60 }],
+    pricingUrl: 'https://docs.midjourney.com/hc/en-us/articles/27870484040333-Comparing-Midjourney-Plans',
+    fitProfile: { speed_depth: 0.5, real_creative: 0.9, logic_visual: 0.9, plan_flow: 0.0, budgetTier: 'premium', deviceFit: 'desktop', infoFreshness: 'neutral' },
+    usageCategories: ['image'],
   },
   seedream: {
     name: 'Seedream (ByteDance)',
@@ -105,8 +186,12 @@ export const aiServices: Record<string, AIService> = {
     description: '빠른 생성, 아시아 스타일 강점',
     priceFree: '무료 가능',
     priceLabel: '무료~유료',
+    priceUSD: 0,
     icon: 'wand-2',
     strengths: { speed: '빠른 이미지 생성', visual: '아시아 스타일에 강함' },
+    tiers: [{ name: 'Free', priceUSD: 0 }],
+    fitProfile: { speed_depth: -0.6, real_creative: 0.5, logic_visual: 0.6, plan_flow: 0.5, budgetTier: 'free', deviceFit: 'both', infoFreshness: 'neutral' },
+    usageCategories: ['image'],
   },
   suno: {
     name: 'Suno',
@@ -114,17 +199,28 @@ export const aiServices: Record<string, AIService> = {
     description: '텍스트로 보컬 포함 완성곡 생성',
     priceFree: '무료 (제한)',
     priceLabel: '$10/월',
-    icon: 'music',
+    priceUSD: 10,
+    icon: 'music-4',
     strengths: { creative: '텍스트만으로 완성곡', flow: '즉흥적 영감을 바로 음악으로' },
+    tiers: [{ name: 'Free', priceUSD: 0 }, { name: 'Pro', priceUSD: 10 }, { name: 'Premier', priceUSD: 30 }],
+    pricingUrl: 'https://suno.com/pricing',
+    fitProfile: { speed_depth: -0.2, real_creative: 0.8, logic_visual: 0.3, plan_flow: 0.7, budgetTier: 'budget', deviceFit: 'both', infoFreshness: 'neutral' },
+    usageCategories: ['media'],
   },
   veo: {
     name: 'Veo (Google)',
     category: 'video',
     description: '고품질 영상 생성, Gemini 연동',
     priceFree: '제한적',
-    priceLabel: '$20/월~',
-    icon: 'video',
+    priceLabel: 'Gemini Plus 이상',
+    priceUSD: 0,
+    icon: 'film',
     strengths: { creative: '텍스트→고품질 영상', plan: 'Gemini와 연동' },
+    tiers: [{ name: 'Gemini 포함', priceUSD: 0, priceKRW: 0 }],
+    planGroup: 'gemini_advanced',
+    bundleNote: 'Gemini 유료 플랜에 포함',
+    fitProfile: { speed_depth: 0.2, real_creative: 0.7, logic_visual: 0.5, plan_flow: -0.2, budgetTier: 'budget', deviceFit: 'desktop', infoFreshness: 'neutral' },
+    usageCategories: ['media'],
   },
   kling: {
     name: 'Kling',
@@ -132,8 +228,12 @@ export const aiServices: Record<string, AIService> = {
     description: '영상 AI, 가성비 좋음',
     priceFree: '무료 가능',
     priceLabel: '무료~유료',
-    icon: 'film',
+    priceUSD: 0,
+    icon: 'video',
     strengths: { speed: '빠른 영상 생성', flow: '무료로 시작 가능' },
+    tiers: [{ name: 'Free', priceUSD: 0 }],
+    fitProfile: { speed_depth: -0.5, real_creative: 0.4, logic_visual: 0.3, plan_flow: 0.5, budgetTier: 'free', deviceFit: 'both', infoFreshness: 'neutral' },
+    usageCategories: ['media'],
   },
   runway: {
     name: 'Runway',
@@ -141,8 +241,13 @@ export const aiServices: Record<string, AIService> = {
     description: '영상 편집 + 생성 종합 플랫폼',
     priceFree: '제한적',
     priceLabel: '$12~28/월',
+    priceUSD: 20,
     icon: 'clapperboard',
     strengths: { depth: '편집+생성 올인원', plan: '영상 워크플로우 체계적' },
+    tiers: [{ name: 'Free', priceUSD: 0 }, { name: 'Standard', priceUSD: 12 }, { name: 'Pro', priceUSD: 28 }],
+    pricingUrl: 'https://runwayml.com/pricing/',
+    fitProfile: { speed_depth: 0.4, real_creative: 0.6, logic_visual: 0.3, plan_flow: -0.4, budgetTier: 'premium', deviceFit: 'desktop', infoFreshness: 'neutral' },
+    usageCategories: ['media'],
   },
   antigravity: {
     name: 'Google Antigravity',
@@ -150,8 +255,12 @@ export const aiServices: Record<string, AIService> = {
     description: 'AI 에이전트 코딩, Google 생태계',
     priceFree: '무료~',
     priceLabel: '무료~유료',
+    priceUSD: 0,
     icon: 'rocket',
     strengths: { logic: '에이전트 기반 자동 코딩', flow: '무료로 시작 가능' },
+    tiers: [{ name: 'Free', priceUSD: 0 }],
+    fitProfile: { speed_depth: 0.0, real_creative: 0.1, logic_visual: -0.5, plan_flow: 0.3, budgetTier: 'free', deviceFit: 'desktop', infoFreshness: 'neutral' },
+    usageCategories: ['coding'],
   },
   cursor: {
     name: 'Cursor',
@@ -159,8 +268,13 @@ export const aiServices: Record<string, AIService> = {
     description: 'VS Code 기반 AI 코드 에디터',
     priceFree: '무료 (제한)',
     priceLabel: '$20/월',
-    icon: 'terminal',
+    priceUSD: 20,
+    icon: 'code-xml',
     strengths: { logic: 'VS Code에서 바로 AI 코딩', plan: '기존 프로젝트에 쉽게 통합' },
+    tiers: [{ name: 'Free', priceUSD: 0 }, { name: 'Pro', priceUSD: 20 }, { name: 'Ultra', priceUSD: 40 }],
+    pricingUrl: 'https://www.cursor.com/pricing',
+    fitProfile: { speed_depth: 0.3, real_creative: -0.2, logic_visual: -0.8, plan_flow: -0.5, budgetTier: 'budget', deviceFit: 'desktop', infoFreshness: 'neutral' },
+    usageCategories: ['coding'],
   },
   claude_code: {
     name: 'Claude Code',
@@ -168,8 +282,13 @@ export const aiServices: Record<string, AIService> = {
     description: '터미널 기반, 정밀한 코딩 에이전트',
     priceFree: '유료 전용',
     priceLabel: '$20/월 (Pro)',
+    priceUSD: 20,
     icon: 'code',
     strengths: { depth: '복잡한 코드 정밀 분석', logic: '터미널에서 직접 코딩' },
+    tiers: [{ name: 'Pro', priceUSD: 20 }, { name: 'Max', priceUSD: 100 }],
+    pricingUrl: 'https://www.anthropic.com/pricing',
+    fitProfile: { speed_depth: 0.7, real_creative: -0.3, logic_visual: -0.9, plan_flow: -0.7, budgetTier: 'budget', deviceFit: 'desktop', infoFreshness: 'verified' },
+    usageCategories: ['coding'],
   },
   perplexity: {
     name: 'Perplexity',
@@ -177,8 +296,13 @@ export const aiServices: Record<string, AIService> = {
     description: 'AI 검색엔진, 출처 표시',
     priceFree: '무료',
     priceLabel: '$20/월 (Pro)',
+    priceUSD: 20,
     icon: 'search',
     strengths: { real: '출처 포함 팩트 기반 검색', speed: '빠른 정보 취합' },
+    tiers: [{ name: 'Free', priceUSD: 0 }, { name: 'Pro', priceUSD: 20 }],
+    pricingUrl: 'https://www.perplexity.ai/pro',
+    fitProfile: { speed_depth: -0.4, real_creative: -0.6, logic_visual: -0.3, plan_flow: 0.0, budgetTier: 'free', deviceFit: 'both', infoFreshness: 'trending' },
+    usageCategories: ['research'],
   },
   notebooklm: {
     name: 'NotebookLM',
@@ -186,8 +310,12 @@ export const aiServices: Record<string, AIService> = {
     description: '문서 분석·요약, 팟캐스트 생성',
     priceFree: '무료',
     priceLabel: '무료',
+    priceUSD: 0,
     icon: 'book-open',
     strengths: { depth: '문서를 깊이 있게 분석', real: '원본 기반 정확한 답변' },
+    tiers: [{ name: 'Free', priceUSD: 0 }],
+    fitProfile: { speed_depth: 0.6, real_creative: -0.4, logic_visual: -0.4, plan_flow: -0.3, budgetTier: 'free', deviceFit: 'both', infoFreshness: 'verified' },
+    usageCategories: ['research'],
   },
   consensus: {
     name: 'Consensus',
@@ -195,8 +323,12 @@ export const aiServices: Record<string, AIService> = {
     description: '학술 논문 검색 특화',
     priceFree: '무료 (제한)',
     priceLabel: '무료~유료',
+    priceUSD: 0,
     icon: 'graduation-cap',
     strengths: { depth: '학술 논문 전문 검색', logic: '근거 기반 분석' },
+    tiers: [{ name: 'Free', priceUSD: 0 }],
+    fitProfile: { speed_depth: 0.8, real_creative: -0.7, logic_visual: -0.8, plan_flow: -0.5, budgetTier: 'free', deviceFit: 'desktop', infoFreshness: 'verified' },
+    usageCategories: ['research'],
   },
   elevenlabs: {
     name: 'ElevenLabs',
@@ -204,8 +336,13 @@ export const aiServices: Record<string, AIService> = {
     description: '자연스러운 음성 복제, 다국어',
     priceFree: '무료 (제한)',
     priceLabel: '$5/월~',
-    icon: 'audio-lines',
+    priceUSD: 5,
+    icon: 'audio-waveform',
     strengths: { creative: '자연스러운 음성 합성', visual: '감정 표현이 풍부' },
+    tiers: [{ name: 'Free', priceUSD: 0 }, { name: 'Starter', priceUSD: 5 }, { name: 'Creator', priceUSD: 22 }],
+    pricingUrl: 'https://elevenlabs.io/pricing',
+    fitProfile: { speed_depth: 0.0, real_creative: 0.7, logic_visual: 0.4, plan_flow: 0.2, budgetTier: 'budget', deviceFit: 'both', infoFreshness: 'neutral' },
+    usageCategories: ['media'],
   },
   google_opal: {
     name: 'Google Opal',
@@ -213,8 +350,12 @@ export const aiServices: Record<string, AIService> = {
     description: '쉬운 노코드 업무 자동화',
     priceFree: '무료~',
     priceLabel: '무료~유료',
-    icon: 'workflow',
+    priceUSD: 0,
+    icon: 'bot',
     strengths: { plan: '업무 자동화 체계적 설정', real: '실무 효율 극대화' },
+    tiers: [{ name: 'Free', priceUSD: 0 }],
+    fitProfile: { speed_depth: 0.1, real_creative: -0.5, logic_visual: -0.3, plan_flow: -0.7, budgetTier: 'free', deviceFit: 'desktop', infoFreshness: 'neutral' },
+    usageCategories: ['automation'],
   },
 };
 
@@ -265,8 +406,8 @@ export const resultTypes: ResultType[] = [
   },
   {
     id: 'strategist',
-    name: '전략적 크리에이터',
-    description: '깊이 파고들어 체계적으로 창작하는 마스터 플래너. 완성도에 집착해요!',
+    name: '철학적 사색가',
+    description: '깊이 파고들어 본질을 꿰뚫는 직관적 탐구자. 왜?라는 질문이 멈추질 않아요!',
     percentage: 8,
     mainLLM: 'claude',
     secondaryLLM: 'chatgpt',

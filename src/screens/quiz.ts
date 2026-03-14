@@ -1,12 +1,18 @@
 import { createElement, icons } from 'lucide';
-import { allQuestions, type Question } from '../data/questions';
+import { allQuestions, type Question, type QuestionOption } from '../data/questions';
+import { injectIcon } from '../utils/icons';
 
-function toPascalCase(name: string): string {
-  return name
-    .split('-')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join('');
-}
+// Q1-Q6 illustration images (Phase 1 only)
+const Q_IMAGE_MAP: Record<number, string> = {
+  1: '/assets/q1message.jpg',
+  2: '/assets/q2_cooking.jpg',
+  3: '/assets/q3_present.jpg',
+  4: '/assets/q4_cleaning.jpg',
+  5: '/assets/q5_karaoke.jpg',
+  6: '/assets/q6_youtube.jpg',
+};
+
+
 
 interface QuizCallbacks {
   onPhase1Complete: (answers: Map<number, string>) => void;
@@ -72,7 +78,10 @@ export function renderQuiz(
     ].join('');
 
     card.innerHTML = `
-      <div class="question-icon" id="q-icon-${q.id}"></div>
+      ${Q_IMAGE_MAP[q.id] ? `
+        <div class="question-illust-wrap">
+          <img class="question-illust-img" src="${Q_IMAGE_MAP[q.id]}" alt="Q${q.id} 일러스트">
+        </div>` : `<div class="question-icon" id="q-icon-${q.id}"></div>`}
       <h2 class="question-text">${q.question}</h2>
       <div class="options">${optionsHTML}</div>
     `;
@@ -197,21 +206,4 @@ function buildOption(_q: Question, value: string, opt: QuestionOption): string {
       </div>
     </button>
   `;
-}
-
-interface QuestionOption {
-  text: string;
-  sub: string;
-  icon: string;
-}
-
-function injectIcon(root: HTMLElement, id: string, iconName: string): void {
-  const container = root.querySelector(`#${id}`);
-  if (!container) return;
-  const pascalName = toPascalCase(iconName);
-  const iconNode = icons[pascalName as keyof typeof icons];
-  if (iconNode) {
-    const svg = createElement(iconNode);
-    container.appendChild(svg);
-  }
 }
