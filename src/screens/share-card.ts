@@ -282,8 +282,8 @@ export async function handleShareCard(result: QuizResult, selectedKeys: string[]
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       await navigator.share({
         files: [file],
-        title: `나의 소울메이트 AI: ${aiServices[result.reasonings[0]?.serviceKey || result.type.mainLLM].name}`,
-        text: `나는 "${result.type.name}" 유형! 👉 ${SITE_URL}`,
+        title: `나에게 딱 맞는 AI는? ${aiServices[result.reasonings[0]?.serviceKey || result.type.mainLLM].name}`,
+        text: `나의 AI 취향은 "${result.type.name}"\n나에게 딱 맞는 AI는? ${aiServices[result.reasonings[0]?.serviceKey || result.type.mainLLM].name}\nhttps://${SITE_URL}`,
       });
       return;
     }
@@ -296,7 +296,7 @@ export async function handleShareCard(result: QuizResult, selectedKeys: string[]
     URL.revokeObjectURL(url);
   } catch (err) {
     console.error('[ShareCard]', err);
-    const text = `나의 소울메이트 AI: "${result.type.name}"\n👉 ${SITE_URL}`;
+    const text = `나의 AI 취향은 "${result.type.name}"\n나에게 딱 맞는 AI는? ${aiServices[result.reasonings[0]?.serviceKey || result.type.mainLLM].name}\nhttps://${SITE_URL}`;
     await navigator.clipboard.writeText(text).catch(() => {});
     alert('이미지 생성에 실패했어요. 텍스트가 복사되었습니다!');
   }
