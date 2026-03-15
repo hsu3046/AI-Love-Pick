@@ -117,7 +117,7 @@ export async function generateShareCard(result: QuizResult, selectedKeys: string
 
   const friendSvcs = selectedKeys
     .filter(k => k !== mainKey)
-    .slice(0, 6)
+    .slice(0, 9)
     .map(k => ({ key: k, svc: aiServices[k] }))
     .filter(x => x.svc);
 
@@ -220,7 +220,7 @@ export async function generateShareCard(result: QuizResult, selectedKeys: string
     <div style="width:calc(100% - 48px);margin-top:14px">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
         ${SVG('<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>', 15, '#e8a838')}
-        <span style="font-size:13px;font-weight:700;color:#888;letter-spacing:0.04em">나의 AI 관련 소비</span>
+        <span style="font-size:13px;font-weight:700;color:#888;letter-spacing:0.04em">AI 친구들과의 교제 비용</span>
       </div>
       <div style="border-radius:16px;padding:12px 24px;text-align:center">
         <span style="display:inline-block;position:relative;padding-bottom:8px">

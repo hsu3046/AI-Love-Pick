@@ -90,7 +90,7 @@ export function calculatePhase2(
   const expMap: Record<string, PracticalProfile['experience']> = { A: 'beginner', B: 'intermediate', C: 'power' };
   const infoMap: Record<string, PracticalProfile['infoStyle']> = { A: 'trending', B: 'verified', C: 'creative' };
   const budgetMap: Record<string, PracticalProfile['budget']> = { A: 'free', B: 'low', C: 'mid', D: 'high' };
-  const budgetKRWMap: Record<string, number> = { A: 0, B: 15000, C: 30000, D: 0 };
+  const budgetKRWMap: Record<string, number> = { A: 0, B: 15000, C: 30000, D: 100000 };
 
   const budgetAnswer = answers.get(12) ?? 'A';
 
@@ -257,8 +257,9 @@ function selectRecommendedServices(
   // LLM 카테고리는 별도로 처리했으므로 제거
   allowedCategories.delete('llm');
 
-  // 비-LLM 서비스: 허용 카테고리에 해당하는 것만 → 카테고리별 top 1
-  const categoryBest = new Map<string, ServiceScore>();
+  // 비-LLM 서비스: 허용 카테고리에 해당하는 것만 → 카테고리별 top 2
+  const MAX_PER_CATEGORY = 2;
+  const categoryTop = new Map<string, ServiceScore[]>();
   for (const s of allScores) {
     const svc = aiServices[s.key];
     if (svc.category === 'llm') continue;
@@ -267,10 +268,11 @@ function selectRecommendedServices(
     const hasMatchingNeed = svc.usageCategories.some(uc => practical.usageNeeds.has(uc));
     if (!hasMatchingNeed) continue;
 
-    const existing = categoryBest.get(svc.category);
-    if (!existing || s.score > existing.score) {
-      categoryBest.set(svc.category, s);
-    }
+    const list = categoryTop.get(svc.category) ?? [];
+    list.push(s);
+    list.sort((a, b) => b.score - a.score);
+    if (list.length > MAX_PER_CATEGORY) list.pop();
+    categoryTop.set(svc.category, list);
   }
 
   // Hard budget accumulator: only recommend extras that fit within remaining budget
@@ -286,7 +288,7 @@ function selectRecommendedServices(
     : Infinity;
 
   const budgetedExtras: ServiceScore[] = [];
-  const sortedExtras = [...categoryBest.values()].sort((a, b) => b.score - a.score);
+  const sortedExtras = [...categoryTop.values()].flat().sort((a, b) => b.score - a.score);
   for (const extra of sortedExtras) {
     const cost = getMinCostKRW(extra.key);
     if (cost <= remainingBudget) {
@@ -423,7 +425,7 @@ function getSecondaryReason(serviceKey: string, practical: PracticalProfile): st
 }
 
 function determineRecommendedTier(p: PracticalProfile, plans: PlanTier[]): 'free' | 'standard' | 'pro' {
-  if (p.budgetKRW === 0) return 'free';
+  if (p.budget === 'free' && p.budgetKRW === 0) return 'free';
 
   const planCosts = new Map<string, number>();
   for (const plan of plans) {

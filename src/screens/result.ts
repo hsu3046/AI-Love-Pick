@@ -223,7 +223,7 @@ export function renderResult(result: QuizResult, onRestart: () => void, answers?
         ${result.practical.budgetKRW > 0 ? `
         <div class="receipt-budget-row">
           <span class="receipt-budget-label">예산</span>
-          <span class="receipt-budget-amount">₩${result.practical.budgetKRW.toLocaleString()}</span>
+          <span class="receipt-budget-amount">${result.practical.budget === 'high' ? '무제한' : `₩${result.practical.budgetKRW.toLocaleString()}`}</span>
         </div>
         <div class="picker-budget-track" style="margin-top:8px">
           <div class="picker-budget-fill" id="picker-budget-fill" style="width: 0%"></div>

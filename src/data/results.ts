@@ -28,6 +28,7 @@ export const usageToCategoryMap: Record<string, string[]> = {
   coding: ['coding'],
   research: ['research'],
   media: ['music', 'video', 'voice'],
+  learning: ['research'],
   automation: ['automation'],
   casual: ['llm'],
 };

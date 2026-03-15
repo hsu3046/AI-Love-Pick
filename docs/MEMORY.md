@@ -1,6 +1,6 @@
-# MatchMakerAI — 프로젝트 메모리
+# AI Love Pick — 프로젝트 메모리
 
-> **Version:** 1.0.0 | **Updated:** 2026-03-12
+> **Version:** 1.1.0 | **Updated:** 2026-03-15
 
 ---
 
@@ -45,22 +45,27 @@
 
 ## ✅ 해결된 이슈 (Resolved Issues)
 
-### 1. ~~`QuestionOption` 인터페이스 중복 정의~~ → 해결
-- `quiz.ts`의 로컬 `QuestionOption` 제거, `questions.ts`에서 import
-
-### 2. ~~`freeLLM` 변수 하드코딩~~ → 해결
-- 무의미한 삼항 연산자 제거 → `const freeLLM = 'gemini'`로 단순화
-
-### 3. ~~`_llmTier` 미사용 매개변수~~ → 해결
-- `estimateTierCost`에서 매개변수 자체를 제거, 호출부도 함께 정리
-
-### 4. ~~`_needKey` 미사용 매개변수~~ → 해결
-- `getUsageReason`에서 `needKey`를 활용하여 카테고리별 맞춤 안내 메시지 생성
+### 6. [2026-03-15] [High] q7_answer Supabase NULL 버그 → 해결
+- **문제:** 7번 질문(multi-select)의 답변이 Supabase에 항상 NULL로 저장됨
+- **원인:** 7번은 `type: 'multi'`라 `answers` Map이 아닌 `multiAnswers` Map에 저장됨. `analytics.ts`에서 `answers.get(7)`만 참조 → 항상 undefined
+- **해결:** `result.practical.usageNeeds`에서 가져와 쉼표 구분 문자열로 저장
+- **방지:** multi-select 질문 추가 시 answers Map 외 별도 처리 필요
 
 ### 5. ~~`intro.ts` 질문 수 하드코딩~~ → 해결
 - "8개 질문 · 약 2분 소요" → "12개 질문 · 약 3분 소요"로 수정
 
+### 4. ~~`_needKey` 미사용 매개변수~~ → 해결
+### 3. ~~`_llmTier` 미사용 매개변수~~ → 해결
+### 2. ~~`freeLLM` 변수 하드코딩~~ → 해결
+### 1. ~~`QuestionOption` 인터페이스 중복 정의~~ → 해결
+
 ## 🟠 남은 이슈 (Remaining Issues)
+
+### Vite dev 서버 모바일 접속 불가
+- **현상:** `--host`로 실행해도 같은 Wi-Fi의 iPhone에서 배경만 표시, JS 콘텐츠 로딩 안 됨
+- **시도:** `vite.config.ts` 생성 + `server.host: true`, 프로덕션 빌드 `serve` — 모두 실패
+- **추정 원인:** Mac 방화벽 또는 공유기 AP 격리 설정
+- **현재 대안:** 모바일 테스트는 Vercel 배포 후 확인
 
 ### `icons` 전체 import로 번들 사이즈 증가
 - **위치:** 모든 screen 파일 + `utils/icons.ts`에서 `import { createElement, icons } from 'lucide'`
@@ -82,15 +87,31 @@
 
 ---
 
+## 🔵 변경 이력 (Recent Changes)
+
+### [2026-03-15] Supabase 테이블 이름 변경
+- `soulai_quiz_submissions` → `ailovepick_quiz_submissions`
+- `soulai_events` → `ailovepick_events`
+- 코드 3곳 (`analytics.ts`) + Supabase SQL `ALTER TABLE RENAME` 실행
+
+### [2026-03-15] 공유 텍스트 수정
+- 제목: `나에게 딱 맞는 AI는? <AI종류>`
+- 본문: `나의 AI 취향은 "<유형명>"` + URL (`https://pick.knowai.app`)
+
+### [2026-03-15] vite.config.ts 추가
+- `server.host: true` 설정 (모바일 접속용, 실제로는 네트워크 문제로 미작동)
+
+---
+
 ## 📊 프로젝트 통계
 
 | 항목 | 값 |
 |------|-----|
-| **소스 파일 수** | 11개 (.ts + .css) |
-| **TypeScript 총 라인** | ~2,200줄 |
-| **CSS 총 라인** | 1,323줄 |
+| **소스 파일 수** | 12개 (.ts + .css) |
+| **Supabase 테이블** | `ailovepick_quiz_submissions`, `ailovepick_events` |
 | **질문 수** | 12개 (Phase 1: 6, Phase 2: 6) |
 | **AI 서비스 수** | 20개 |
 | **유형 수** | 8개 |
-| **런타임 의존성** | 1개 (lucide) |
-| **빌드 의존성** | 2개 (typescript, vite) |
+| **사이트 URL** | `pick.knowai.app` |
+| **런타임 의존성** | lucide, html2canvas, @supabase/supabase-js |
+| **빌드 의존성** | typescript, vite |
