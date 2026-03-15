@@ -1,11 +1,10 @@
 import './style.css';
 import { renderIntro } from './screens/intro';
 import { renderQuiz } from './screens/quiz';
-import { renderTransition } from './screens/transition';
 import { renderLoading } from './screens/loading';
 import { renderResult } from './screens/result';
-import { calculatePhase1, calculateResult } from './engine/scoring';
-import { resultTypes } from './data/results';
+import { calculateResult } from './engine/scoring';
+import { trackScreenView, initDwellTracking } from './lib/analytics';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -29,35 +28,28 @@ function startApp(): void {
   let phase1Answers: Map<number, string>;
 
   const intro = renderIntro(() => {
+    trackScreenView('quiz_phase1');
     // Phase 1: Personality quiz
     const quiz1 = renderQuiz(1, {
       onPhase1Complete: (answers) => {
         phase1Answers = answers;
 
-        // Quick phase1 calc to get type name for transition
-        const { scores } = calculatePhase1(answers);
-        const bestType = findBestType(scores);
-
-        // Show transition screen
-        const transition = renderTransition(bestType.name, () => {
-          // Phase 2: Practical quiz
-          const quiz2 = renderQuiz(2, {
-            onPhase1Complete: () => {},
-            onAllComplete: (p2Answers, multiAnswers) => {
-              // Merge all answers
-              const allAnswers = new Map([...phase1Answers, ...p2Answers]);
-
-              const loading = renderLoading(() => {
-                const result = calculateResult(allAnswers, multiAnswers);
-                const resultScreen = renderResult(result, startApp);
-                showScreen(resultScreen);
-              });
-              showScreen(loading);
-            },
-          });
-          showScreen(quiz2);
+        // Skip transition — go directly to Phase 2 practical quiz
+        const quiz2 = renderQuiz(2, {
+          onPhase1Complete: () => {},
+          onAllComplete: (p2Answers, multiAnswers) => {
+            const allAnswers = new Map([...phase1Answers, ...p2Answers]);
+            const loading = renderLoading(() => {
+              const result = calculateResult(allAnswers, multiAnswers);
+              const resultScreen = renderResult(result, startApp, allAnswers);
+              trackScreenView('result');
+              showScreen(resultScreen);
+            });
+            showScreen(loading);
+          },
         });
-        showScreen(transition);
+        trackScreenView('quiz_phase2');
+        showScreen(quiz2);
       },
       onAllComplete: () => {},
     });
@@ -66,18 +58,6 @@ function startApp(): void {
   showScreen(intro);
 }
 
-function findBestType(scores: { speed_depth: number; real_creative: number; logic_visual: number; plan_flow: number }) {
-  let best = resultTypes[0];
-  let bestD = Infinity;
-  for (const rt of resultTypes) {
-    const d =
-      Math.pow(scores.speed_depth - rt.traits.speed_depth, 2) +
-      Math.pow(scores.real_creative - rt.traits.real_creative, 2) +
-      Math.pow(scores.logic_visual - rt.traits.logic_visual, 2) +
-      Math.pow(scores.plan_flow - rt.traits.plan_flow, 2);
-    if (d < bestD) { bestD = d; best = rt; }
-  }
-  return best;
-}
 
+initDwellTracking();
 startApp();

@@ -18,7 +18,7 @@ export function renderIntro(onStart: () => void): HTMLElement {
       <div class="intro-text">
         <h1 class="intro-title">나에게 딱 맞는<br/><span class="highlight">AI</span>는?</h1>
         <p class="intro-subtitle">간단한 심리 테스트로<br/>나만의 AI 소울메이트를 찾아보세요</p>
-        <p class="intro-meta">성향 질문 6개 · 약 1분 소요</p>
+        <p class="intro-meta">질문 12개 · 약 1분</p>
       </div>
       <button class="btn-start" id="btn-start">
         <span>테스트 시작하기</span>

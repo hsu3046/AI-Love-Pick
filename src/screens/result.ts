@@ -3,27 +3,80 @@ import { type QuizResult } from '../engine/scoring';
 import { aiServices } from '../data/results';
 import { injectIcon } from '../utils/icons';
 import { handleShareCard } from './share-card';
+import { submitQuizResult, trackShareClick } from '../lib/analytics';
+import {
+  animateCharacterEntrance,
+  animateResultHero,
+  animateSoulmateCard,
+  animateInsightBanner,
+  animateSecondaryCards,
+  attachTiltEffect,
+} from '../animations';
 
-export function renderResult(result: QuizResult, onRestart: () => void): HTMLElement {
+/** Shorten KRW price for compact display: 360000→'36만원/월', 29000→'2.9만원/월', 7000→'7,000원/월' */
+function shortKRW(krw: number): string {
+  if (krw === 0) return '';
+  if (krw >= 10000) {
+    const man = krw / 10000;
+    return `${man % 1 === 0 ? man.toFixed(0) : man.toFixed(1)}만원/월`;
+  }
+  return `${krw.toLocaleString()}원/월`;
+}
+
+export function renderResult(result: QuizResult, onRestart: () => void, answers?: Map<number, string>): HTMLElement {
   const el = document.createElement('div');
   el.className = 'screen screen-result';
 
-  const { type, scores, reasonings, insightSummary } = result;
+  const { type, scores, reasonings } = result;
 
   const mainReasoning = reasonings[0];
   const recommendedKeys = new Set(reasonings.map(r => r.serviceKey));
   const mainSvc = aiServices[mainReasoning?.serviceKey || type.mainLLM];
+  const budgetTotal = result.practical.budgetKRW;
+  const USD_TO_KRW = 1400;
+
+  /** Pre-compute tier assignments with cumulative budget tracking.
+   *  Soulmate gets first pick, then recommended services in order.
+   *  Each service picks the highest tier fitting the REMAINING budget. */
+  const tierAssignments: Record<string, number> = {};
+  {
+    let remaining = budgetTotal;
+    function pickTier(_key: string, tiers: { priceUSD: number; priceKRW?: number }[]): number {
+      if (remaining <= 0 || tiers.length <= 1) return 0;
+      let best = 0;
+      for (let i = 1; i < tiers.length; i++) {
+        const krw = tiers[i].priceKRW ?? Math.round(tiers[i].priceUSD * USD_TO_KRW);
+        if (krw <= remaining) best = i;
+      }
+      if (best > 0) {
+        remaining -= tiers[best].priceKRW ?? Math.round(tiers[best].priceUSD * USD_TO_KRW);
+      }
+      return best;
+    }
+    // 1) Soulmate AI gets priority
+    const mainKey = mainReasoning?.serviceKey || type.mainLLM;
+    tierAssignments[mainKey] = pickTier(mainKey, mainSvc.tiers);
+    // 2) Recommended services in order
+    Object.entries(aiServices)
+      .filter(([k]) => k !== mainKey && recommendedKeys.has(k))
+      .forEach(([k, svc]) => {
+        tierAssignments[k] = pickTier(k, svc.tiers);
+      });
+  }
+
+  const mainDefaultTier = tierAssignments[mainReasoning?.serviceKey || type.mainLLM] ?? 0;
 
 
   el.innerHTML = `
     <div class="result-content">
-      <!-- Hero (unchanged) -->
+      <!-- Hero -->
       <div class="result-hero" style="--accent: ${type.color}">
+        <h1 class="result-type-name">${type.name}</h1>
         <div class="result-illustration" id="result-illustration">
           <div class="illust-sparkle-wrap">
             <img
               class="result-illust-img"
-              src="/assets/${type.id}.jpg"
+              src="/assets/${type.id}.png"
               alt="${type.name} 캐릭터"
               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
             >
@@ -37,15 +90,14 @@ export function renderResult(result: QuizResult, onRestart: () => void): HTMLEle
             <span class="sparkle s5"></span>
           </div>
         </div>
-        <h1 class="result-type-name">${type.name}</h1>
-        <p class="result-type-desc">${type.description}</p>
+        <p class="result-type-desc">${type.description.replace('. ', '.<br>')}</p>
         <div class="result-percentage">
           <span class="percentage-icon" id="percentage-icon"></span>
           <span>전체 사용자의 <strong>${type.percentage}%</strong>가 이 유형</span>
         </div>
       </div>
 
-      <!-- Trait Chart (unchanged) -->
+      <!-- Trait Chart -->
       <div class="result-chart-section">
         <h2 class="section-title">나의 AI 성향</h2>
         <div class="trait-bars">
@@ -56,12 +108,6 @@ export function renderResult(result: QuizResult, onRestart: () => void): HTMLEle
         </div>
       </div>
 
-      <!-- Insight (unchanged) -->
-      <div class="insight-banner">
-        <span class="insight-icon" id="insight-icon"></span>
-        <p class="insight-text">${insightSummary}</p>
-      </div>
-
       <!-- ★ NEW: AI Soulmate Section -->
       <div class="soulmate-section">
         <h2 class="section-title"><span class="section-icon" id="section-soulmate-icon"></span> 당신의 AI 소울메이트</h2>
@@ -69,7 +115,7 @@ export function renderResult(result: QuizResult, onRestart: () => void): HTMLEle
         <!-- Main LLM — big hero card -->
         <div class="soulmate-main" id="soulmate-main-card"
           data-svc-key="${mainReasoning?.serviceKey || type.mainLLM}"
-          data-selected-price="${mainSvc.tiers[0]?.priceUSD ?? 0}">
+          data-selected-price="${mainSvc.tiers[mainDefaultTier]?.priceUSD ?? 0}">
           <div class="soulmate-main-header">
           ${{chatgpt:'/assets/chatgpt.svg',gemini:'/assets/gemini.svg.png',claude:'/assets/claude.svg',grok:'/assets/grok.svg'}[mainReasoning?.serviceKey || ''] ?
              `<img class="soulmate-main-logo" src="${{chatgpt:'/assets/chatgpt.svg',gemini:'/assets/gemini.svg.png',claude:'/assets/claude.svg',grok:'/assets/grok.svg'}[mainReasoning?.serviceKey || '']}" alt="${mainSvc.name}">` :
@@ -85,13 +131,16 @@ export function renderResult(result: QuizResult, onRestart: () => void): HTMLEle
             ${mainSvc.tiers.length > 1 ? `
               <div class="soulmate-plan-tiers">
                 ${mainSvc.tiers.map((t, ti) => {
-                  const krw = t.priceUSD * 1400;
-                  const label = t.priceUSD === 0 ? t.name : `${t.name} ₩${krw.toLocaleString()}`;
-                  return `<button class="picker-tier-btn soulmate-tier-btn${ti === 0 ? ' active' : ''}" data-tier-price="${t.priceUSD}" data-tier-idx="${ti}" data-svc-key="${mainReasoning?.serviceKey || type.mainLLM}">${label}</button>`;
+                  const krw = Math.round(t.priceUSD * 1400);
+                  const priceStr = t.priceUSD === 0 ? '' : ` ${shortKRW(krw)}`;
+                  const nameOnly = t.name;
+                  const namePrice = `${t.name}${priceStr}`;
+                  const isActive = ti === mainDefaultTier;
+                  return `<button class="picker-tier-btn soulmate-tier-btn${isActive ? ' active' : ''}" data-tier-price="${t.priceUSD}" data-tier-idx="${ti}" data-svc-key="${mainReasoning?.serviceKey || type.mainLLM}" data-label="${nameOnly}" data-label-price="${namePrice}">${isActive ? namePrice : nameOnly}</button>`;
                 }).join('')}
-              </div>` : `<span class="picker-item-price">${mainSvc.tiers[0]?.priceUSD === 0 ? '무료' : `₩${(mainSvc.tiers[0].priceUSD * 1400).toLocaleString()}/월`}</span>`
+              </div>
+            ` : `<span class="picker-item-price">${mainSvc.tiers[0]?.priceUSD === 0 ? '무료' : `₩${(mainSvc.tiers[0].priceUSD * 1400).toLocaleString()}/월`}</span>`
             }
-            ${mainSvc.pricingUrl ? `<a class="picker-pricing-link inline" href="${mainSvc.pricingUrl}" target="_blank" rel="noopener">가격표</a>` : ''}
           </div>
         </div>
 
@@ -115,14 +164,7 @@ export function renderResult(result: QuizResult, onRestart: () => void): HTMLEle
             .map(([key, svc], si) => {
             const isRecommended = recommendedKeys.has(key);
             const tiers = svc.tiers;
-            const groupSiblings = svc.planGroup
-              ? Object.entries(aiServices)
-                  .filter(([k, s]) => s.planGroup === svc.planGroup && k !== key)
-                  .map(([, s]) => s.name)
-              : [];
-            const groupNote = groupSiblings.length > 0
-              ? `<span class="plan-group-note">${groupSiblings.join(' / ')} 포함</span>`
-              : '';
+            const groupNote = '';
             // 5. 공식 로고 (4대 LLM)
             const logoMap: Record<string, string> = {
               chatgpt: '/assets/chatgpt.svg',
@@ -135,27 +177,29 @@ export function renderResult(result: QuizResult, onRestart: () => void): HTMLEle
               ? `<img class="picker-item-logo" src="${logoUrl}" alt="${svc.name}">`
               : `<span class="picker-item-icon" id="picker-icon-${si}"></span>`;
             return `
-              <div class="picker-item${isRecommended ? ' checked' : ''}" data-key="${key}" data-selected-price="0" data-plan-group="${svc.planGroup || ''}" data-bundle-note="${svc.bundleNote || ''}" style="animation-delay: ${si * 0.02}s">
+              <div class="picker-item${isRecommended ? ' checked' : ''}" data-key="${key}" data-selected-price="${isRecommended ? tiers[tierAssignments[key] ?? 0]?.priceUSD ?? 0 : 0}" data-plan-group="${svc.planGroup || ''}" data-bundle-note="${svc.bundleNote || ''}" style="animation-delay: ${si * 0.02}s">
                 ${iconHtml}
                 <div class="picker-item-info">
                   <div class="picker-item-name-row">
                     <span class="picker-item-name">${svc.name}</span>
-                    ${(!svc.bundleNote && svc.pricingUrl) ? `<a class="picker-pricing-link inline" href="${svc.pricingUrl}" target="_blank" rel="noopener" title="가격표 보기">가격표</a>` : ''}
                   </div>
                   ${svc.bundleNote ? `
                     <span class="plan-group-note">${svc.bundleNote}</span>
                   ` : tiers.length > 1 ? `
                     <div class="picker-tier-toggle">
-                      ${tiers.map((t, ti) => {
+              ${tiers.map((t, ti) => {
                         const krw = t.priceKRW ?? Math.round(t.priceUSD * 1400);
-                        const label = krw === 0 ? t.name : `${t.name} ₩${krw.toLocaleString()}`;
-                        const isDefault = ti === 0;
-                        return `<button class="picker-tier-btn${isDefault ? ' active' : ''}" data-tier-price="${t.priceUSD}" data-tier-krw="${krw}" data-tier-idx="${ti}">${label}</button>`;
+                        const priceStr = krw === 0 ? '' : ` ${shortKRW(krw)}`;
+                        const nameOnly = t.name;
+                        const namePrice = `${t.name}${priceStr}`;
+                        const defaultIdx = isRecommended ? (tierAssignments[key] ?? 0) : 0;
+                        const isDefault = ti === defaultIdx;
+                        return `<button class="picker-tier-btn${isDefault ? ' active' : ''}" data-tier-price="${t.priceUSD}" data-tier-krw="${krw}" data-tier-idx="${ti}" data-label="${nameOnly}" data-label-price="${namePrice}">${isDefault ? namePrice : nameOnly}</button>`;
                       }).join('')}
                     </div>
                     ${groupNote}
                   ` : `
-                    <span class="picker-item-price">${(() => { const krw = tiers[0]?.priceKRW ?? Math.round((tiers[0]?.priceUSD || 0) * 1400); return krw === 0 ? '무료' : `₩${krw.toLocaleString()}/월`; })()}</span>
+                    <span class="picker-item-price">${(() => { const t0 = tiers[0]; const krw = t0?.priceKRW ?? Math.round((t0?.priceUSD || 0) * 1400); if (krw === 0) { return t0?.name === 'Free' ? '무료' : t0?.name || '무료'; } return `₩${krw.toLocaleString()}/월`; })()}</span>
                   `}
                 </div>
                 <span class="picker-check"></span>
@@ -188,6 +232,10 @@ export function renderResult(result: QuizResult, onRestart: () => void): HTMLEle
         ` : ''}
       </div>
 
+      <p class="receipt-disclaimer" style="text-align:center;font-size:11px;color:#bbb;margin:8px 24px 0;line-height:1.5">
+        ※ 가격은 환율 변동 및 서비스 업체의 정책에 따라 변동될 수 있습니다.
+      </p>
+
       <!-- Actions -->
       <div class="result-actions">
         <button class="btn-share" id="btn-share">
@@ -205,9 +253,32 @@ export function renderResult(result: QuizResult, onRestart: () => void): HTMLEle
     injectIcon(el, 'section-soulmate-icon', 'crosshair');
     injectIcon(el, 'insight-icon', 'sparkles');
 
+    // Submit quiz result for anonymous analytics (fire-and-forget)
+    if (answers) {
+      submitQuizResult(answers, result);
+    }
+
     injectIcon(el, 'soulmate-main-icon', mainSvc.icon);
     injectIcon(el, 'receipt-title-icon', 'receipt');
-    // secondary no longer rendered as a card
+
+    // Motion-powered entrance animations
+    const charImg = el.querySelector('.result-illust-img');
+    if (charImg) animateCharacterEntrance(charImg);
+
+    const hero = el.querySelector('.result-hero');
+    if (hero) animateResultHero(hero);
+
+    const insightBanner = el.querySelector('.insight-banner');
+    if (insightBanner) animateInsightBanner(insightBanner);
+
+    const soulmateCard = el.querySelector('.soulmate-main');
+    if (soulmateCard) animateSoulmateCard(soulmateCard);
+
+    animateSecondaryCards(el.querySelectorAll('.picker-item'));
+
+    // Tilt effect on character image container
+    const illustContainer = el.querySelector('.result-illustration');
+    if (illustContainer) attachTiltEffect(illustContainer);
 
     // Picker service icons — MUST match exact filter+sort order as HTML rendering
     const mainSvcKey = mainReasoning?.serviceKey;
@@ -242,27 +313,61 @@ export function renderResult(result: QuizResult, onRestart: () => void): HTMLEle
       });
 
       // Helper: sync plan group siblings
-      const syncPlanGroup = (sourceItem: HTMLElement, checked: boolean, tierIdx?: string) => {
+      const syncPlanGroup = (sourceItem: HTMLElement, checked: boolean, _tierIdx?: string) => {
         const group = sourceItem.dataset.planGroup;
         if (!group) return;
-        pickerGrid.querySelectorAll(`.picker-item[data-plan-group="${group}"]`).forEach(sibling => {
-          const sib = sibling as HTMLElement;
-          if (sib === sourceItem) return;
-          if (checked) {
-            if (!sib.classList.contains('checked')) sib.classList.add('checked');
-            // Sync tier selection if specified
-            if (tierIdx !== undefined) {
-              const sibBtn = sib.querySelector(`.picker-tier-btn[data-tier-idx="${tierIdx}"]`) as HTMLElement;
-              if (sibBtn) {
-                sib.querySelectorAll('.picker-tier-btn').forEach(b => b.classList.remove('active'));
-                sibBtn.classList.add('active');
-                sib.dataset.selectedPrice = sibBtn.dataset.tierPrice || '0';
+        const isBundledChild = !!sourceItem.dataset.bundleNote;
+        const requiresPaidPlan = (sourceItem.dataset.bundleNote || '').includes('유료 플랜이');
+
+        // Only child → parent: when a bundled child is checked, auto-check the foundation model
+        if (checked && isBundledChild) {
+          pickerGrid.querySelectorAll(`.picker-item[data-plan-group="${group}"]`).forEach(sibling => {
+            const sib = sibling as HTMLElement;
+            if (sib === sourceItem) return;
+            // Parent = the one WITHOUT bundleNote
+            if (!sib.dataset.bundleNote) {
+              if (!sib.classList.contains('checked')) sib.classList.add('checked');
+              // Auto-select paid tier if the child requires a paid plan
+              if (requiresPaidPlan) {
+                const activeBtn = sib.querySelector('.picker-tier-btn.active') as HTMLElement | null;
+                const currentIdx = parseInt(activeBtn?.dataset.tierIdx || '0');
+                if (currentIdx === 0) {
+                  const paidBtn = sib.querySelector('.picker-tier-btn[data-tier-idx="1"]') as HTMLElement | null;
+                  if (paidBtn) {
+                    sib.querySelectorAll('.picker-tier-btn').forEach(b => {
+                      const bEl = b as HTMLElement;
+                      b.classList.remove('active');
+                      bEl.textContent = bEl.dataset.label || bEl.textContent;
+                    });
+                    paidBtn.classList.add('active');
+                    paidBtn.textContent = paidBtn.dataset.labelPrice || paidBtn.textContent;
+                    sib.dataset.selectedPrice = paidBtn.dataset.tierPrice || '0';
+                  }
+                }
+              }
+
+              // Sync soulmate card if it matches this parent service
+              const soulmateCard = el.querySelector('#soulmate-main-card') as HTMLElement | null;
+              if (soulmateCard && soulmateCard.dataset.svcKey === sib.dataset.key && requiresPaidPlan) {
+                const smActiveBtn = soulmateCard.querySelector('.soulmate-tier-btn.active') as HTMLElement | null;
+                const smIdx = parseInt(smActiveBtn?.dataset.tierIdx || '0');
+                if (smIdx === 0) {
+                  const smPaidBtn = soulmateCard.querySelector('.soulmate-tier-btn[data-tier-idx="1"]') as HTMLElement | null;
+                  if (smPaidBtn) {
+                    soulmateCard.querySelectorAll('.soulmate-tier-btn').forEach(b => {
+                      const bEl = b as HTMLElement;
+                      b.classList.remove('active');
+                      bEl.textContent = bEl.dataset.label || bEl.textContent;
+                    });
+                    smPaidBtn.classList.add('active');
+                    smPaidBtn.textContent = smPaidBtn.dataset.labelPrice || smPaidBtn.textContent;
+                    soulmateCard.dataset.selectedPrice = smPaidBtn.dataset.tierPrice || '0';
+                  }
+                }
               }
             }
-          } else {
-            sib.classList.remove('checked');
-          }
-        });
+          });
+        }
       };
 
       const recalc = () => {
@@ -363,15 +468,20 @@ export function renderResult(result: QuizResult, onRestart: () => void): HTMLEle
       // Click handler
       pickerGrid.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
-        // Pricing link — let it navigate, don't toggle card
-        if (target.closest('.picker-pricing-link')) return;
         const tierBtn = target.closest('.picker-tier-btn') as HTMLElement;
         if (tierBtn) {
           e.stopPropagation();
           const item = tierBtn.closest('.picker-item') as HTMLElement;
           if (!item) return;
-          item.querySelectorAll('.picker-tier-btn').forEach(b => b.classList.remove('active'));
+          // Reset all: show name only
+          item.querySelectorAll('.picker-tier-btn').forEach(b => {
+            b.classList.remove('active');
+            const el = b as HTMLElement;
+            el.textContent = el.dataset.label || el.textContent;
+          });
+          // Active: show name + price
           tierBtn.classList.add('active');
+          tierBtn.textContent = tierBtn.dataset.labelPrice || tierBtn.textContent;
           item.dataset.selectedPrice = tierBtn.dataset.tierPrice || '0';
           if (!item.classList.contains('checked')) item.classList.add('checked');
           // Auto-link plan group siblings
@@ -384,29 +494,6 @@ export function renderResult(result: QuizResult, onRestart: () => void): HTMLEle
         if (item) {
           const willBeChecked = !item.classList.contains('checked');
           item.classList.toggle('checked');
-
-          // If a bundled service is checked → auto-upgrade planGroup parent to paid tier
-          if (willBeChecked && item.dataset.bundleNote) {
-            const group = item.dataset.planGroup;
-            if (group) {
-              const parent = pickerGrid.querySelector(
-                `.picker-item[data-plan-group="${group}"][data-bundle-note=""]`
-              ) as HTMLElement | null;
-              if (parent) {
-                parent.classList.add('checked');
-                const activeBtn = parent.querySelector('.picker-tier-btn.active') as HTMLElement | null;
-                const currentIdx = parseInt(activeBtn?.dataset.tierIdx || '0');
-                if (currentIdx === 0) {
-                  const paidBtn = parent.querySelector('.picker-tier-btn[data-tier-idx="1"]') as HTMLElement | null;
-                  if (paidBtn) {
-                    parent.querySelectorAll('.picker-tier-btn').forEach(b => b.classList.remove('active'));
-                    paidBtn.classList.add('active');
-                    parent.dataset.selectedPrice = paidBtn.dataset.tierPrice || '0';
-                  }
-                }
-              }
-            }
-          }
 
           // Auto-link plan group siblings
           syncPlanGroup(item, willBeChecked);
@@ -424,8 +511,15 @@ export function renderResult(result: QuizResult, onRestart: () => void): HTMLEle
         soulmateCard.querySelectorAll('.soulmate-tier-btn').forEach(btn => {
           btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            soulmateCard.querySelectorAll('.soulmate-tier-btn').forEach(b => b.classList.remove('active'));
+            // Reset all: name only
+            soulmateCard.querySelectorAll('.soulmate-tier-btn').forEach(b => {
+              b.classList.remove('active');
+              const el = b as HTMLElement;
+              el.textContent = el.dataset.label || el.textContent;
+            });
+            // Active: name + price
             btn.classList.add('active');
+            (btn as HTMLElement).textContent = (btn as HTMLElement).dataset.labelPrice || btn.textContent;
             soulmateCard.dataset.selectedPrice = (btn as HTMLElement).dataset.tierPrice || '0';
             recalc();
           });
@@ -441,13 +535,18 @@ export function renderResult(result: QuizResult, onRestart: () => void): HTMLEle
       shareIcon.classList.add('btn-icon');
       shareBtn.prepend(shareIcon);
       shareBtn.addEventListener('click', () => {
+        trackShareClick(type.id);
         // Collect currently checked service keys from the picker
         const selectedKeys: string[] = [];
         el.querySelectorAll('.picker-item.checked').forEach(item => {
           const key = (item as HTMLElement).dataset.key;
           if (key) selectedKeys.push(key);
         });
-        handleShareCard(result, selectedKeys);
+        // Read total from receipt
+        const receiptAmountEl = el.querySelector('#receipt-total-amount');
+        const totalText = receiptAmountEl?.textContent?.replace(/[^\d]/g, '') || '0';
+        const totalKRW = parseInt(totalText, 10) || 0;
+        handleShareCard(result, selectedKeys, totalKRW);
       });
     }
 

@@ -15,8 +15,8 @@ export function renderLoading(onDone: () => void): HTMLElement {
 
   const messages = [
     '당신의 AI 성향을 분석 중...',
-    '8가지 성향을 계산하고 있어요...',
-    '딱 맞는 AI를 찾았어요!',
+    '12가지 질문을 바탕으로 딱 맞는 AI를 찾고 있어요...',
+    '당신의 소울메이트 AI를 찾았어요!',
   ];
 
   let step = 0;

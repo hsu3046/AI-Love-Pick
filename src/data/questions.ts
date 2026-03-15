@@ -30,7 +30,7 @@ export interface Question {
   scoring?: QuestionScoring;
   flags?: SpecialFlag[];
   /** Which practical field this question determines */
-  practicalField?: 'usage' | 'frequency' | 'priority' | 'device' | 'infoStyle' | 'budget';
+  practicalField?: 'usage' | 'frequency' | 'priority' | 'experience' | 'infoStyle' | 'budget';
 }
 
 // ===== Phase 1: 성향 질문 (6개) =====
@@ -117,7 +117,7 @@ export const phase1Questions: Question[] = [
     optionA: {
       text: '마이크 독차지!',
       sub: '신청곡이 10개는 기본',
-      icon: 'music',
+      icon: 'mic',
     },
     optionB: {
       text: '듣는 게 더 좋아',
@@ -174,8 +174,9 @@ export const phase2Questions: Question[] = [
       { key: 'coding', text: '코딩 · 개발', icon: 'code' },
       { key: 'research', text: '정보 검색 · 리서치', icon: 'search' },
       { key: 'media', text: '영상 · 음악 만들기', icon: 'film' },
+      { key: 'learning', text: '학습 · 공부', icon: 'book-open' },
       { key: 'automation', text: '업무 자동화', icon: 'workflow' },
-      { key: 'casual', text: '그냥 궁금한 거 질문', icon: 'message-circle' },
+      { key: 'casual', text: '궁금한 거 질문', icon: 'message-circle' },
     ],
     practicalField: 'usage',
   },
@@ -229,31 +230,31 @@ export const phase2Questions: Question[] = [
     id: 10,
     phase: 2,
     type: 'single',
-    question: 'AI를 주로 어디서 써요?',
-    icon: 'monitor-smartphone',
+    question: 'AI를 얼마나 써봤어요?',
+    icon: 'bot',
     optionA: {
-      text: '모바일',
-      sub: '스마트폰이 메인',
-      icon: 'smartphone',
+      text: '거의 처음',
+      sub: '이제 막 시작하는 단계',
+      icon: 'sprout',
     },
     optionB: {
-      text: 'PC · 노트북',
-      sub: '데스크탑 작업 위주',
+      text: '좀 써봤어요',
+      sub: '기본 활용은 익숙해요',
       icon: 'laptop',
     },
     optionC: {
-      text: '둘 다',
-      sub: '상황에 따라 다르게',
-      icon: 'monitor-smartphone',
+      text: '파워 유저',
+      sub: '프롬프트 엔지니어링까지',
+      icon: 'zap',
     },
-    practicalField: 'device',
+    practicalField: 'experience',
   },
   {
     id: 11,
     phase: 2,
     type: 'single',
     question: 'AI에게 원하는 정보는?',
-    icon: 'radar',
+    icon: 'search',
     optionA: {
       text: '최신 뉴스 · 트렌드',
       sub: '실시간 핫한 정보!',

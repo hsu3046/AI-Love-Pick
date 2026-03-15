@@ -90,7 +90,7 @@ body {
 .screen-intro {
   justify-content: center;
   align-items: center;
-  padding: 24px 24px 40px;
+  padding: 0 24px 40px;
 }
 
 .intro-content {
@@ -102,9 +102,9 @@ body {
 }
 
 .intro-illustration {
-  width: 100%;
-  max-width: 320px;
-  aspect-ratio: 1 / 1;
+  width: calc(100% + 48px);
+  margin-left: -24px;
+  margin-right: -24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -117,13 +117,22 @@ body {
   height: 100%;
 }
 
-/* ① Float — gentle bob */
-.intro-cover-img,
+/* ① Float — gentle bob: intro cover (full bleed, no border-radius) */
+.intro-cover-img {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  border-radius: 0;
+  display: block;
+  animation: illust-float 3.6s ease-in-out infinite;
+}
+/* result screen AI character (keeps border-radius) */
 .result-illust-img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: var(--radius-xl);
+  height: auto;
+  max-height: 400px;
+  object-fit: contain;
+  border-radius: 0;
   display: block;
   animation: illust-float 3.6s ease-in-out infinite;
 }
@@ -133,8 +142,8 @@ body {
   50%       { transform: translateY(-9px); }
 }
 
-/* ② Shimmer — diagonal light sweep */
-.illust-sparkle-wrap::after {
+/* ② Shimmer — diagonal light sweep (intro illustration only) */
+.intro-illustration .illust-sparkle-wrap::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -999,7 +1008,9 @@ body {
   border-radius: var(--radius-md);
   padding: 20px;
   box-shadow: var(--shadow-md);
-  border: 2px solid #E8A090;
+  border: 3px solid transparent;
+  background: linear-gradient(var(--bg-card), var(--bg-card)) padding-box,
+              linear-gradient(90deg, var(--accent), #E85D75, var(--pastel-purple)) border-box;
   position: relative;
   overflow: hidden;
   animation: fadeInUp 0.4s ease both;
@@ -1011,7 +1022,7 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  height: 4px;
+  height: 6px;
   background: linear-gradient(90deg, var(--accent), #E85D75, var(--pastel-purple));
 }
 
@@ -1091,9 +1102,8 @@ body {
 /* Plan tier row on soulmate main card */
 .soulmate-main-plan-row {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-direction: column;
+  gap: 8px;
   margin-top: 8px;
   padding-top: 10px;
   border-top: 1px solid rgba(0,0,0,0.06);
@@ -1103,7 +1113,6 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  flex: 1;
 }
 
 /* Smaller tier button variant for soulmate card */
@@ -1140,7 +1149,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-top: 24px;
+  margin-top: 4px;
 }
 
 .soulmate-sec-label {
@@ -1265,7 +1274,7 @@ body {
 .start-section {
   display: flex;
   flex-direction: column;
-  margin-top: 4px;
+  margin-top: -20px;
 }
 
 .picker-subtitle {
@@ -1405,8 +1414,13 @@ body {
 /* Tier toggle */
 .picker-tier-toggle {
   display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   gap: 4px;
+  scrollbar-width: none;
 }
+.picker-tier-toggle::-webkit-scrollbar { display: none; }
 
 .plan-group-note {
   font-size: 0.625rem;
@@ -1414,6 +1428,40 @@ body {
   font-weight: 600;
   opacity: 0.8;
   margin-top: 1px;
+}
+
+/* Tier scroll wrapper with arrows */
+.tier-scroll-wrap {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.tier-scroll-btn {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: all var(--transition);
+}
+
+.tier-scroll-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 /* Pricing link */
@@ -1606,23 +1654,25 @@ body {
 
 .multi-options {
   width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
 .multi-option-card {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
+  gap: 8px;
   width: 100%;
-  padding: 14px 16px;
+  padding: 16px 10px;
   border: 2px solid transparent;
   border-radius: var(--radius-sm);
   background: var(--bg-card);
   box-shadow: var(--shadow-sm);
   cursor: pointer;
-  text-align: left;
+  text-align: center;
   font-family: var(--font);
   transition: all var(--transition);
 }
@@ -1637,28 +1687,9 @@ body {
 }
 
 .multi-check {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--accent-light);
-  border-radius: 6px;
-  color: transparent;
-  transition: all var(--transition);
+  display: none;
 }
 
-.multi-check svg {
-  width: 14px;
-  height: 14px;
-}
-
-.multi-option-card.checked .multi-check {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
-}
 
 .multi-icon {
   flex-shrink: 0;
@@ -1671,8 +1702,8 @@ body {
 }
 
 .multi-icon svg {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
 }
 
 .multi-text {
@@ -1696,8 +1727,9 @@ body {
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
-  transition: all var(--transition);
-  margin-top: 4px;
+  transition: all var(--transition), transform 0.3s ease;
+  margin-top: 8px;
+  transform: translateY(0);
 }
 
 .btn-confirm:disabled {

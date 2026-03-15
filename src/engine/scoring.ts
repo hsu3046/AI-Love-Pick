@@ -13,7 +13,7 @@ export interface PracticalProfile {
   usageNeeds: Set<string>;
   frequency: 'occasional' | 'daily' | 'heavy';
   priority: 'cost' | 'time' | 'quality';
-  device: 'mobile' | 'desktop' | 'both';
+  experience: 'beginner' | 'intermediate' | 'power';
   infoStyle: 'trending' | 'verified' | 'creative';
   budget: 'free' | 'low' | 'mid' | 'high';
   budgetKRW: number;  // 월 예산 한도 (원)
@@ -87,7 +87,7 @@ export function calculatePhase2(
 
   const freqMap: Record<string, PracticalProfile['frequency']> = { A: 'occasional', B: 'daily', C: 'heavy' };
   const prioMap: Record<string, PracticalProfile['priority']> = { A: 'cost', B: 'time', C: 'quality' };
-  const deviceMap: Record<string, PracticalProfile['device']> = { A: 'mobile', B: 'desktop', C: 'both' };
+  const expMap: Record<string, PracticalProfile['experience']> = { A: 'beginner', B: 'intermediate', C: 'power' };
   const infoMap: Record<string, PracticalProfile['infoStyle']> = { A: 'trending', B: 'verified', C: 'creative' };
   const budgetMap: Record<string, PracticalProfile['budget']> = { A: 'free', B: 'low', C: 'mid', D: 'high' };
   const budgetKRWMap: Record<string, number> = { A: 0, B: 15000, C: 30000, D: 0 };
@@ -98,7 +98,7 @@ export function calculatePhase2(
     usageNeeds,
     frequency: freqMap[answers.get(8) ?? 'A'] ?? 'occasional',
     priority: prioMap[answers.get(9) ?? 'A'] ?? 'cost',
-    device: deviceMap[answers.get(10) ?? 'C'] ?? 'both',
+    experience: expMap[answers.get(10) ?? 'A'] ?? 'beginner',
     infoStyle: infoMap[answers.get(11) ?? 'B'] ?? 'verified',
     budget: budgetMap[budgetAnswer] ?? 'free',
     budgetKRW: budgetKRWMap[budgetAnswer] ?? 0,
@@ -134,9 +134,9 @@ export function calculateResult(
   const mainReasoning = reasonings[0];
   const mainSvc = aiServices[mainLLMKey];
   const insightSummary = mainReasoning?.traitMatch
-    ? `${mainReasoning.traitMatch} 성향인 당신에게는 ${mainSvc?.name}이(가) 딱 맞아요. ${mainReasoning.headline}`
+    ? `${mainReasoning.traitMatch} 성향인 당신에게 딱 맞는 AI는 ${mainSvc?.name}! ${mainReasoning.headline}에 강해요`
     : mainReasoning?.headline
-    ? `당신의 소울메이트 AI는 ${mainSvc?.name}이에요. ${mainReasoning.headline}`
+    ? `당신의 소울메이트 AI는 ${mainSvc?.name}! ${mainReasoning.headline}에 강해요`
     : type.insights.summary;
 
   const plans = buildPlans(
@@ -213,9 +213,12 @@ function computeServiceFitness(
   if (practical.frequency === 'heavy' && fp.budgetTier !== 'free') traitScore += 0.1;
   if (practical.frequency === 'occasional' && fp.budgetTier === 'free') traitScore += 0.1;
 
-  // 5. 기기 적합도 (Q10)
-  if (practical.device === 'mobile' && fp.deviceFit === 'desktop') traitScore -= 0.15;
-  if (practical.device === 'desktop' && fp.deviceFit === 'mobile') traitScore -= 0.1;
+  // 5. AI 경험 수준 (Q10)
+  if (practical.experience === 'beginner' && fp.experienceLevel === 'beginner') traitScore += 0.2;
+  if (practical.experience === 'beginner' && fp.experienceLevel === 'advanced') traitScore -= 0.3;
+  if (practical.experience === 'power' && fp.experienceLevel === 'advanced') traitScore += 0.25;
+  if (practical.experience === 'power' && fp.experienceLevel === 'beginner') traitScore -= 0.15;
+  if (practical.experience === 'intermediate' && fp.experienceLevel === 'intermediate') traitScore += 0.1;
 
   // 6. 정보 신선도 (Q11)
   if (practical.infoStyle === 'trending' && fp.infoFreshness === 'trending') traitScore += 0.2;

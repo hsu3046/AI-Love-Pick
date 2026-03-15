@@ -36,7 +36,7 @@ const SVG = (path: string, size = 15, color = '#999') =>
 const ICON_BAR   = (c: string) => SVG('<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>', 15, c);
 const ICON_USERS = (c: string) => SVG('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>', 15, c);
 const ICON_LINK  = (c: string) => SVG('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>', 14, c);
-const ICON_STAR  = (c: string) => SVG('<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>', 18, c);
+const ICON_STAR  = (c: string) => SVG('<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>', 24, c);
 
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace('#', '');
@@ -105,7 +105,7 @@ function traitRow(left: string, right: string, value: number, accent: string): s
     </div>`;
 }
 
-export async function generateShareCard(result: QuizResult, selectedKeys: string[]): Promise<Blob> {
+export async function generateShareCard(result: QuizResult, selectedKeys: string[], totalKRW = 0): Promise<Blob> {
   const { type, scores, reasonings } = result;
   const mainKey = reasonings[0]?.serviceKey || type.mainLLM;
   const mainSvc = aiServices[mainKey];
@@ -131,7 +131,7 @@ export async function generateShareCard(result: QuizResult, selectedKeys: string
     <div style="width:calc(100% - 48px);margin-top:14px">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
         ${ICON_USERS(accent)}
-        <span style="font-size:13px;font-weight:700;color:#888;letter-spacing:0.04em">같이 놀면 좋은 AI 친구들</span>
+        <span style="font-size:13px;font-weight:700;color:#888;letter-spacing:0.04em">함께하면 좋은 AI 친구들</span>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:8px">
         ${friendSvcs.map(({ key, svc }) => {
@@ -139,7 +139,7 @@ export async function generateShareCard(result: QuizResult, selectedKeys: string
           const iconHtml = dUrl
             ? `<img src="${dUrl}" style="width:20px;height:20px;flex-shrink:0;">`
             : `<span style="display:flex;align-items:center;flex-shrink:0;color:${accent}">${lucideHtml(svc.icon, 20, accent)}</span>`;
-          return `<div style="display:flex;align-items:center;gap:9px;background:white;border-radius:14px;padding:11px 16px;box-shadow:0 2px 10px rgba(0,0,0,0.07);width:calc(50% - 4px);box-sizing:border-box;text-align:left">
+          return `<div style="display:flex;align-items:center;gap:7px;background:white;border-radius:12px;padding:9px 12px;box-shadow:0 2px 10px rgba(0,0,0,0.07);width:calc(33.33% - 6px);box-sizing:border-box;text-align:left">
             ${iconHtml}
             <span style="font-size:13px;font-weight:700;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${svc.name}</span>
           </div>`;
@@ -148,11 +148,11 @@ export async function generateShareCard(result: QuizResult, selectedKeys: string
     </div>` : '';
 
   const wrap = document.createElement('div');
-  wrap.style.cssText = 'position:fixed;left:-9999px;top:0;width:540px;height:960px;overflow:hidden;z-index:-1;';
+  wrap.style.cssText = 'position:fixed;left:-9999px;top:0;width:540px;height:1060px;overflow:hidden;z-index:-1;';
 
   wrap.innerHTML = `
   <div style="
-    position:relative;width:540px;height:960px;
+    position:relative;width:540px;height:1060px;
     display:flex;flex-direction:column;align-items:center;
     padding:0 0 28px;box-sizing:border-box;
     background:linear-gradient(165deg,${mix(accent,0.12)} 0%,#fffaf7 35%,${mix(accent,0.06)} 100%);
@@ -171,7 +171,7 @@ export async function generateShareCard(result: QuizResult, selectedKeys: string
 
     <!-- SOULMATE CARD -->
     <div style="width:calc(100% - 48px);background:white;border-radius:24px;box-shadow:0 8px 32px rgba(0,0,0,0.10);border:2px solid ${soft};overflow:hidden">
-      <div style="height:5px;background:linear-gradient(90deg,${accent},#fbc2eb,${accent})"></div>
+      <div style="height:8px;background:linear-gradient(90deg,${accent},#fbc2eb,${accent})"></div>
       <div style="padding:18px 18px 0 18px">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
           ${logoDataUrl
@@ -186,7 +186,7 @@ export async function generateShareCard(result: QuizResult, selectedKeys: string
       </div>
       <!-- Character image (absolute centering — no object-fit:cover) -->
       <div style="position:relative;width:100%;height:280px;overflow:hidden">
-        <img src="/assets/${type.id}.jpg" crossorigin="anonymous" alt="${type.name}"
+        <img src="/assets/${type.id}.png" crossorigin="anonymous" alt="${type.name}"
           style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:100%;height:auto;min-height:200px;display:block">
         <div style="position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(transparent,rgba(0,0,0,0.6))"></div>
         <div style="position:absolute;bottom:12px;left:16px;right:16px">
@@ -216,13 +216,28 @@ export async function generateShareCard(result: QuizResult, selectedKeys: string
     <!-- FRIEND SERVICES -->
     ${friendHtml}
 
+    <!-- AI MONTHLY COST -->
+    <div style="width:calc(100% - 48px);margin-top:14px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+        ${SVG('<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>', 15, '#e8a838')}
+        <span style="font-size:13px;font-weight:700;color:#888;letter-spacing:0.04em">나의 AI 관련 소비</span>
+      </div>
+      <div style="border-radius:16px;padding:12px 24px;text-align:center">
+        <span style="display:inline-block;position:relative;padding-bottom:8px">
+          <span style="font-size:15px;font-weight:700;color:#999;letter-spacing:0.06em">${totalKRW > 0 ? '₩' : ''}</span><span style="font-size:28px;font-weight:900;color:#222;letter-spacing:0.15em">${totalKRW > 0 ? totalKRW.toLocaleString() : '무료'}</span><span style="font-size:15px;font-weight:700;color:#999;letter-spacing:0.06em">${totalKRW > 0 ? '/월' : ''}</span>
+          <span style="position:absolute;bottom:0;left:-12px;right:-12px;height:6px;border-radius:3px;background:linear-gradient(90deg,#84fab0,#8fd3f4,#f6d365,#fbc2eb)"></span>
+        </span>
+      </div>
+    </div>
+
+
     <!-- FOOTER -->
     <div style="margin-top:auto;padding-top:16px;display:flex;flex-direction:column;align-items:center;gap:4px">
       <div style="display:flex;align-items:center;gap:5px">
         ${ICON_LINK(accent)}
         <span style="font-size:15px;font-weight:800;color:${accent};letter-spacing:0.02em">${SITE_URL}</span>
       </div>
-      <span style="font-size:11px;color:#ccc;letter-spacing:0.04em">나에게 맞는 AI 찾기</span>
+      <span style="font-size:11px;color:#ccc;letter-spacing:0.04em">나에게 딱 맞는 AI 찾기</span>
     </div>
   </div>`;
 
@@ -244,7 +259,7 @@ export async function generateShareCard(result: QuizResult, selectedKeys: string
     allowTaint: true,   // allow data: URLs
     backgroundColor: '#fffaf7',
     width: 540,
-    height: 960,
+    height: 1060,
     logging: false,
     imageTimeout: 10000,
   });
@@ -259,9 +274,9 @@ export async function generateShareCard(result: QuizResult, selectedKeys: string
   });
 }
 
-export async function handleShareCard(result: QuizResult, selectedKeys: string[] = []): Promise<void> {
+export async function handleShareCard(result: QuizResult, selectedKeys: string[] = [], totalKRW = 0): Promise<void> {
   try {
-    const blob = await generateShareCard(result, selectedKeys);
+    const blob = await generateShareCard(result, selectedKeys, totalKRW);
     const file = new File([blob], `ai-match-${result.type.id}.png`, { type: 'image/png' });
 
     if (navigator.canShare && navigator.canShare({ files: [file] })) {

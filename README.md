@@ -1,30 +1,33 @@
-# 🤖 MatchMakerAI
+# AI Love Pick
 
 ## Tagline-en
 
-Your AI soulmate is one quiz away. Answer 12 fun questions and get a personalized AI toolkit — matched to your personality, budget, and workflow.
+Say goodbye to wandering lost among countless AIs!
+Discover your **'AI Soulmate'** — one that fits your taste and your wallet. Ready to see the optimized AI setup that 'AI Love Pick' has crafted just for you?
 
 ## Tagline-ko
 
-나에게 딱 맞는 AI를 찾아주는 심리 테스트. 12개 질문에 답하면, 성향·예산·용도에 맞춘 나만의 AI 조합을 추천해드려요.
+수많은 AI 사이에서 방황하던 유목민 시절은 이제 안녕!
+당신의 취향과 지갑 사정까지 배려한 **'AI 소울메이트'**를 찾아보세요. 'AI Love Pick'이 제안하는 당신만의 최적화된 AI 셋업, 지금 확인해보실래요?
 
 ## Tagline-ja
 
-あなたにぴったりのAIを見つける性格診断クイズ。12の質問に答えるだけで、性格・予算・用途にマッチしたAI組み合わせを提案します。
+数えきれないAIの間で迷子になっていた遊牧民時代はもう終わり！
+あなたの好みもお財布事情もしっかり考慮した**「AIソウルメイト」**を見つけましょう。「AI Love Pick」が提案する、あなただけの最適化されたAIセットアップ、今すぐチェックしてみませんか？
 
 ---
 
 ## Summary-en
 
-Ever stared at ChatGPT, Claude, Gemini, and a dozen other AIs wondering "Which one is actually for me?" — you're not alone. MatchMakerAI turns that paralyzing choice into a playful 12-question quiz. First, six personality questions figure out whether you're a speed-first optimizer or a deep-dive analyst. Then, six practical questions nail down your budget, device, and what you actually want AI to do. The result? A personalized "AI Soulmate" card with a main LLM, a backup LLM, and exactly the right creative tools — with a live budget calculator so you can mix and match tiers on the spot.
+Too many AIs, too little time — sound familiar? AI Love Pick turns that overwhelming choice into a fun 12-question personality quiz. Six questions uncover whether you’re a speed-first optimizer or a deep-dive analyst, then six more nail down your budget, device, and what you actually need AI for. The result: your personal “AI Soulmate” card complete with a main LLM, a backup LLM, and hand-picked creative tools — plus a live budget calculator so you can mix and match tiers on the spot. No sign-up, no backend, no data collected — just your perfect AI setup in under 3 minutes.
 
 ## Summary-ko
 
-ChatGPT, Claude, Gemini… AI가 너무 많아서 뭘 써야 할지 모르겠다면, 여기가 딱이에요. MatchMakerAI는 재미있는 심리 테스트 12문항을 통해 당신의 성향을 분석하고, 20개 이상의 AI 서비스 중에서 딱 맞는 조합을 추천해드립니다. "카톡이 100개 쌓이면 어떻게 해요?" 같은 일상 질문부터, 예산·기기·용도 같은 실전 질문까지. 결과 화면에서는 메인 AI 소울메이트와 보조 AI, 그리고 용도별 추천 도구가 한눈에 보이고, 티어를 바꿔가며 실시간으로 예산을 맞춰볼 수 있어요.
+ChatGPT, Claude, Gemini… AI가 너무 많아서 뭘 써야 할지 모르겠다면, 여기가 딱이에요. ‘AI Love Pick’은 재미있는 12문항 심리 테스트로 당신의 성향을 분석하고, 20개 이상의 AI 서비스 중에서 딱 맞는 조합을 추천해드립니다. "카톡이 100개 쌓이면 어떻게 해요?" 같은 일상 질문부터, 예산·기기·용도 같은 실전 질문까지. 결과 화면에서는 메인 AI 소울메이트와 보조 AI, 그리고 용도별 추천 도구가 한눈에 보이고, 티어를 바꿰가며 실시간으로 예산을 맞춰볼 수 있어요.
 
 ## Summary-ja
 
-ChatGPT、Claude、Gemini… AIが多すぎて何を使えばいいか分からない？MatchMakerAIは12問の楽しい心理テストであなたの性格を分析し、20以上のAIサービスからぴったりの組み合わせを提案します。「LINEが100件溜まったらどうする？」のような日常の質問から、予算・デバイス・用途などの実践的な質問まで。結果画面ではメインAIソウルメイトとサブAI、用途別おすすめツールが一目で分かり、ティアを切り替えながらリアルタイムで予算シミュレーションができます。
+ChatGPT、Claude、Gemini… AIが多すぎて何を使えばいいか分からない？AI Love Pickは12問の楽しい心理テストであなたの性格を分析し、20以上のAIサービスからぴったりの組み合わせを提案します。「LINEが100件溜まったらどうする？」のような日常の質問から、予算・デバイス・用途などの実践的な質問まで。結果画面ではメインAIソウルメイトとサブAI、用途別おすすめツールが一目で分かり、ティアを切り替えながらリアルタイムで予算シミュレーションができます。
 
 ---
 

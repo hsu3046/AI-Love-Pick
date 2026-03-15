@@ -145,11 +145,8 @@ export function renderQuiz(
 
       requestAnimationFrame(() => card.classList.remove('entering'));
 
-      // Check icon placeholder
-      card.querySelectorAll('.multi-check').forEach((checkEl) => {
-        const svg = createElement(icons.Check);
-        checkEl.appendChild(svg);
-      });
+      const confirmBtn = card.querySelector('#btn-confirm') as HTMLButtonElement;
+      const confirmText = confirmBtn?.querySelector('span');
 
       card.querySelectorAll('.multi-option-card').forEach((optEl) => {
         optEl.addEventListener('click', () => {
@@ -161,12 +158,15 @@ export function renderQuiz(
             selected.add(key);
             optEl.classList.add('checked');
           }
-          const confirmBtn = card.querySelector('#btn-confirm') as HTMLButtonElement;
           if (confirmBtn) confirmBtn.disabled = selected.size === 0;
+          if (confirmText) {
+            confirmText.textContent = selected.size > 0
+              ? `선택 완료 (${selected.size}개)`
+              : '선택 완료';
+          }
         });
       });
 
-      const confirmBtn = card.querySelector('#btn-confirm');
       if (confirmBtn) {
         const iconSvg = createElement(icons.ArrowRight);
         iconSvg.classList.add('btn-icon');

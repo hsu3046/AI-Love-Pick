@@ -13,7 +13,7 @@ export function renderTransition(typeName: string, onContinue: () => void): HTML
       <p class="transition-subtitle">성향 분석 완료!</p>
       <div class="transition-divider"></div>
       <p class="transition-next">이제 딱 맞는 AI 플랜을<br/>추천해 드릴게요</p>
-      <p class="transition-meta">실전 질문 6개 · 약 1분</p>
+      <p class="transition-meta">실전 질문 6개 · 약 1분 소요</p>
       <button class="btn-continue" id="btn-continue">
         <span>맞춤 추천 받기</span>
       </button>
