@@ -29,7 +29,7 @@ export async function submitQuizResult(
       q5_answer: answers.get(5) ?? null,
       q6_answer: answers.get(6) ?? null,
       // Phase 2 answers (Q7–Q12)
-      q7_answer: answers.get(7) ?? null,
+      q7_answer: practical.usageNeeds.size > 0 ? Array.from(practical.usageNeeds).join(',') : null,
       q8_answer: answers.get(8) ?? null,
       q9_answer: answers.get(9) ?? null,
       q10_answer: answers.get(10) ?? null,
@@ -57,7 +57,7 @@ export async function submitQuizResult(
       locale: navigator.language,
     };
 
-    const { error } = await supabase.from('soulai_quiz_submissions').insert(row);
+    const { error } = await supabase.from('ailovepick_quiz_submissions').insert(row);
     if (error) {
       console.warn('[Analytics] Submit failed:', error.message);
       submitted = false; // Allow retry
@@ -78,7 +78,7 @@ export function trackEvent(
   data?: { screen?: string; result_type_id?: string; metadata?: Record<string, unknown> },
 ): void {
   if (!supabase) return;
-  supabase.from('soulai_events').insert({
+  supabase.from('ailovepick_events').insert({
     session_id: sessionId,
     event,
     screen: data?.screen ?? null,
@@ -116,7 +116,7 @@ export function initDwellTracking(): void {
     if (duration < 2) return; // Ignore bounces under 2s
 
     // Use fetch with keepalive for reliable delivery on page unload
-    const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/soulai_events`;
+    const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/ailovepick_events`;
     const body = JSON.stringify({
       session_id: sessionId,
       event: 'session_end',
