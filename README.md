@@ -19,15 +19,15 @@ Discover your **'AI Soulmate'** — one that fits your taste and your wallet. Re
 
 ## Summary-en
 
-Too many AIs, too little time — sound familiar? AI Love Pick turns that overwhelming choice into a fun 12-question personality quiz. Six questions uncover whether you’re a speed-first optimizer or a deep-dive analyst, then six more nail down your budget, device, and what you actually need AI for. The result: your personal “AI Soulmate” card complete with a main LLM, a backup LLM, and hand-picked creative tools — plus a live budget calculator so you can mix and match tiers on the spot. No sign-up, no backend, no data collected — just your perfect AI setup in under 3 minutes.
+ChatGPT, Claude, Gemini… too many AIs and no idea which one to pick? You're in the right place. AI Love Pick analyzes your personality through a fun 12-question quiz and recommends the perfect combination from over 20 AI services. From everyday questions like "What do you do when 100 messages pile up?" to practical ones about budget, devices, and use cases — it covers everything. On the results screen you'll see your main AI Soulmate, a backup AI, and curated tools for every need, plus subscription plans matched to your budget — all at a glance.
 
 ## Summary-ko
 
-ChatGPT, Claude, Gemini… AI가 너무 많아서 뭘 써야 할지 모르겠다면, 여기가 딱이에요. ‘AI Love Pick’은 재미있는 12문항 심리 테스트로 당신의 성향을 분석하고, 20개 이상의 AI 서비스 중에서 딱 맞는 조합을 추천해드립니다. "카톡이 100개 쌓이면 어떻게 해요?" 같은 일상 질문부터, 예산·기기·용도 같은 실전 질문까지. 결과 화면에서는 메인 AI 소울메이트와 보조 AI, 그리고 용도별 추천 도구가 한눈에 보이고, 티어를 바꿰가며 실시간으로 예산을 맞춰볼 수 있어요.
+ChatGPT, Claude, Gemini… AI가 너무 많아서 뭘 써야 할지 모르겠다면, 여기가 딱이에요. 'AI Love Pick'은 재미있는 12문항 심리 테스트로 당신의 성향을 분석하고, 20개 이상의 AI 서비스 중에서 나에게 맞는 조합을 추천해드립니다. "카톡이 100개 쌓이면 어떻게 해요?" 같은 일상 질문부터, 예산·기기·용도 같은 실전 질문까지 모두 담았어요. 결과 화면에서는 메인 AI 소울메이트와 보조 AI, 용도별 추천 도구는 물론, 예산에 맞는 구독 플랜까지 한눈에 확인할 수 있습니다.
 
 ## Summary-ja
 
-ChatGPT、Claude、Gemini… AIが多すぎて何を使えばいいか分からない？AI Love Pickは12問の楽しい心理テストであなたの性格を分析し、20以上のAIサービスからぴったりの組み合わせを提案します。「LINEが100件溜まったらどうする？」のような日常の質問から、予算・デバイス・用途などの実践的な質問まで。結果画面ではメインAIソウルメイトとサブAI、用途別おすすめツールが一目で分かり、ティアを切り替えながらリアルタイムで予算シミュレーションができます。
+ChatGPT、Claude、Gemini… AIが多すぎて何を使えばいいか分からない？ここがぴったりの場所です。AI Love Pickは12問の楽しい心理テストであなたの性格を分析し、20以上のAIサービスからあなたに合った組み合わせをおすすめします。「LINEが100件溜まったらどうする？」のような日常の質問から、予算・デバイス・用途などの実践的な質問まで、すべて網羅しています。結果画面ではメインAIソウルメイトとサブAI、用途別おすすめツールはもちろん、予算に合ったサブスクプランまで一目で確認できます。
 
 ---
 
